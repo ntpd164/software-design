@@ -5,10 +5,7 @@ const literatureService = require("../services/literatureService");
 const uri =
   "mongodb+srv://duongngo1616:vzYfPnMrEB3yF6Qy@literature.s3u8i.mongodb.net/literature_db?retryWrites=true&w=majority";
 const dbName = "literature_db";
-const client = new MongoClient(uri, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+const client = new MongoClient(uri);
 
 // Danh sách chủ đề gợi ý cố định
 const SUGGESTED_TOPICS = [

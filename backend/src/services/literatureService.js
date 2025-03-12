@@ -6,10 +6,7 @@ const API_URL = "https://vi.wikipedia.org/w/api.php";
 const uri =
   "mongodb+srv://duongngo1616:vzYfPnMrEB3yF6Qy@literature.s3u8i.mongodb.net/literature_db?retryWrites=true&w=majority";
 const dbName = "literature_db";
-const client = new MongoClient(uri, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+const client = new MongoClient(uri);
 
 // Sử dụng Gemini để tìm một tác phẩm văn học Việt Nam phù hợp nhất với chủ đề
 exports.findBestLiteraryWork = async (topic) => {

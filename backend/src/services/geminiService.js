@@ -5,10 +5,7 @@ const GEMINI_API_KEY = "AIzaSyDsZk60rT2odfZ2CIPNhxylxuLKMR9Vj7g";
 const uri =
   "mongodb+srv://duongngo1616:vzYfPnMrEB3yF6Qy@literature.s3u8i.mongodb.net/literature_db?retryWrites=true&w=majority";
 const dbName = "literature_db";
-const client = new MongoClient(uri, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+const client = new MongoClient(uri);
 
 exports.generateScript = async (prompt) => {
   try {
