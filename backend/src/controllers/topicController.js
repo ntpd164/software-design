@@ -41,7 +41,6 @@ exports.getSuggestions = async (req, res) => {
 };
 
 // API tìm kiếm tác phẩm dựa trên chủ đề từ người dùng
-// API tìm kiếm tác phẩm dựa trên chủ đề từ người dùng
 exports.findWorks = async (req, res) => {
   try {
     const { topic } = req.query;
@@ -148,7 +147,7 @@ exports.fetchArticle = async (req, res) => {
 // API tạo kịch bản cho chủ đề được nhập
 exports.generateScriptByTopic = async (req, res) => {
   try {
-    const { topic, style } = req.body;
+    const { topic, style, isManualMode, contentParams } = req.body;
 
     if (!topic) {
       return res.status(400).json({
@@ -216,33 +215,94 @@ exports.generateScriptByTopic = async (req, res) => {
     let prompt;
     const worksContent = `Tác phẩm: ${workData.title}\n${workData.introduction}`;
 
-    switch (contentStyle) {
-      case "analysis":
-        prompt = `Hãy tạo một kịch bản video phân tích văn học về chủ đề "${topic}" thông qua tác phẩm "${workData.title}".
+    // Xử lý chế độ thủ công nếu được kích hoạt
+    if (isManualMode && contentParams) {
+      // Tạo prompt với các tham số tùy chỉnh từ người dùng
+      const lengthMap = {
+        short: "ngắn (khoảng 500-800 từ)",
+        medium: "vừa phải (khoảng 800-1200 từ)",
+        long: "dài (khoảng 1200-2000 từ)",
+      };
+
+      const toneMap = {
+        formal: "học thuật, trang trọng",
+        conversational: "đối thoại, dễ hiểu",
+        enthusiastic: "nhiệt huyết, cuốn hút",
+      };
+
+      const complexityMap = {
+        simple: "đơn giản, dễ hiểu cho học sinh",
+        medium: "trung bình, phù hợp cho sinh viên",
+        complex: "phức tạp, chuyên sâu cho người chuyên ngành",
+      };
+
+      const focusElements = contentParams.focusOn
+        .map((focus) => {
+          switch (focus) {
+            case "themes":
+              return "chủ đề và thông điệp";
+            case "characters":
+              return "nhân vật và tính cách";
+            case "context":
+              return "bối cảnh lịch sử và xã hội";
+            case "language":
+              return "ngôn ngữ và kỹ thuật viết";
+            default:
+              return focus;
+          }
+        })
+        .join(", ");
+
+      prompt = `Hãy tạo một kịch bản video văn học về tác phẩm "${
+        workData.title
+      }" liên quan đến chủ đề "${topic}" với các yêu cầu cụ thể sau:
+
+1. Phong cách: ${
+        contentStyle === "analysis"
+          ? "phân tích văn học"
+          : contentStyle === "storytelling"
+          ? "kể chuyện"
+          : "minh họa thơ ca"
+      }
+2. Độ dài: ${lengthMap[contentParams.length]}
+3. Giọng điệu: ${toneMap[contentParams.tone]}
+4. Độ phức tạp: ${complexityMap[contentParams.complexity]}
+5. Tập trung vào: ${focusElements}
+
+Dựa trên thông tin sau về tác phẩm:
+${worksContent}
+
+Hãy tạo kịch bản có cấu trúc rõ ràng, hấp dẫn và đáp ứng đúng các yêu cầu về độ dài, giọng điệu và độ phức tạp đã nêu.`;
+    } else {
+      // Chế độ tự động - sử dụng prompt mặc định dựa trên phong cách
+      switch (contentStyle) {
+        case "analysis":
+          prompt = `Hãy tạo một kịch bản video phân tích văn học về chủ đề "${topic}" thông qua tác phẩm "${workData.title}".
 Kịch bản cần có cấu trúc rõ ràng với phần giới thiệu, phân tích chuyên sâu, và kết luận.
 Đưa ra các ví dụ cụ thể và phân tích ý nghĩa văn học.
 Dựa trên thông tin sau:
 ${worksContent}`;
-        break;
+          break;
 
-      case "storytelling":
-        prompt = `Hãy tạo một kịch bản video kể chuyện hấp dẫn về tác phẩm "${workData.title}" liên quan đến chủ đề "${topic}".
+        case "storytelling":
+          prompt = `Hãy tạo một kịch bản video kể chuyện hấp dẫn về tác phẩm "${workData.title}" liên quan đến chủ đề "${topic}".
 Kịch bản cần có cốt truyện rõ ràng, nhân vật sinh động và giọng kể chuyện cuốn hút.
 Dựa trên thông tin sau:
 ${worksContent}`;
-        break;
+          break;
 
-      case "poetry":
-        prompt = `Hãy tạo một kịch bản video minh họa thơ ca về tác phẩm "${workData.title}" liên quan đến chủ đề "${topic}".
+        case "poetry":
+          prompt = `Hãy tạo một kịch bản video minh họa thơ ca về tác phẩm "${workData.title}" liên quan đến chủ đề "${topic}".
 Kịch bản cần phân tích ý nghĩa của tác phẩm, và giải thích nghệ thuật trong tác phẩm.
 Dựa trên thông tin sau:
 ${worksContent}`;
-        break;
+          break;
 
-      default:
-        prompt = `Hãy tạo một kịch bản video văn học về tác phẩm "${workData.title}" liên quan đến chủ đề "${topic}".
+        default:
+          prompt = `Hãy tạo một kịch bản video văn học về tác phẩm "${workData.title}" liên quan đến chủ đề "${topic}".
 Dựa trên thông tin sau:
 ${worksContent}`;
+      }
     }
 
     // 4. Gọi Gemini API để tạo kịch bản
@@ -306,5 +366,186 @@ exports.saveScript = async (req, res) => {
     });
   } finally {
     await client.close();
+  }
+};
+
+// API lấy thông tin kịch bản theo ID
+exports.getScript = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "Script ID is required",
+      });
+    }
+
+    await client.connect();
+    const db = client.db(dbName);
+    const scriptsCollection = db.collection("topic_scripts");
+
+    const script = await scriptsCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!script) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy kịch bản",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      script,
+    });
+  } catch (error) {
+    console.error("Error in getScript:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  } finally {
+    await client.close();
+  }
+};
+
+// API cập nhật kịch bản
+exports.updateScript = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { content, status } = req.body;
+
+    if (!id || !content) {
+      return res.status(400).json({
+        success: false,
+        message: "Script ID and content are required",
+      });
+    }
+
+    await client.connect();
+    const db = client.db(dbName);
+    const scriptsCollection = db.collection("topic_scripts");
+
+    const updateData = {
+      content,
+      updatedAt: new Date(),
+    };
+
+    if (status) {
+      updateData.status = status;
+    }
+
+    const result = await scriptsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy kịch bản",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Kịch bản đã được cập nhật",
+      scriptId: id,
+    });
+  } catch (error) {
+    console.error("Error in updateScript:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  } finally {
+    await client.close();
+  }
+};
+
+// API phê duyệt kịch bản
+exports.approveScript = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "Vui lòng cung cấp ID kịch bản",
+      });
+    }
+
+    const result = await scriptService.approveScript(id);
+
+    res.status(200).json({
+      success: true,
+      message: "Kịch bản đã được phê duyệt",
+      scriptId: id,
+    });
+  } catch (error) {
+    console.error("Error in approveScript:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// API tự động điều chỉnh kịch bản
+exports.autoAdjustScript = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { adjustment } = req.body;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "Script ID is required",
+      });
+    }
+
+    if (!adjustment) {
+      return res.status(400).json({
+        success: false,
+        message: "Yêu cầu điều chỉnh là bắt buộc",
+      });
+    }
+
+    const result = await geminiService.autoAdjustScript(id, adjustment);
+
+    res.status(200).json({
+      success: true,
+      message: "Kịch bản đã được điều chỉnh tự động",
+      scriptId: id,
+      content: result.content,
+    });
+  } catch (error) {
+    console.error("Error in autoAdjustScript:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// API lấy danh sách kịch bản của người dùng
+exports.getUserScripts = async (req, res) => {
+  try {
+    const { limit } = req.query;
+
+    const scripts = await scriptService.getUserScripts(
+      limit ? parseInt(limit) : 10
+    );
+
+    res.status(200).json({
+      success: true,
+      scripts,
+    });
+  } catch (error) {
+    console.error("Error in getUserScripts:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };

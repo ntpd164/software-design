@@ -389,3 +389,61 @@ exports.fetchAndSaveArticle = async (pageId, title) => {
     await client.close();
   }
 };
+
+
+// Phê duyệt kịch bản
+exports.approveScript = async (scriptId) => {
+  try {
+    await client.connect();
+    const db = client.db(dbName);
+    const scriptsCollection = db.collection("topic_scripts");
+
+    const result = await scriptsCollection.updateOne(
+      { _id: new ObjectId(scriptId) },
+      {
+        $set: {
+          status: "approved",
+          approvedAt: new Date(),
+        },
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      throw new Error("Không tìm thấy kịch bản");
+    }
+
+    return {
+      success: true,
+      scriptId,
+    };
+  } catch (error) {
+    console.error("Error in approveScript:", error);
+    throw error;
+  } finally {
+    await client.close();
+  }
+};
+
+
+
+// Lấy danh sách kịch bản của người dùng
+exports.getUserScripts = async (limit = 10) => {
+  try {
+    await client.connect();
+    const db = client.db(dbName);
+    const scriptsCollection = db.collection("topic_scripts");
+
+    const scripts = await scriptsCollection
+      .find({})
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray();
+
+    return scripts;
+  } catch (error) {
+    console.error("Error in getUserScripts:", error);
+    throw error;
+  } finally {
+    await client.close();
+  }
+};

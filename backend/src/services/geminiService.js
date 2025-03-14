@@ -72,3 +72,94 @@ exports.upsertScript = async (workId, scriptContent) => {
     await client.close();
   }
 };
+
+// Lấy thông tin kịch bản dựa theo ID
+exports.getScriptById = async (scriptId) => {
+  try {
+    await client.connect();
+    const db = client.db(dbName);
+    const scriptsCollection = db.collection("topic_scripts");
+
+    const script = await scriptsCollection.findOne({
+      _id: new ObjectId(scriptId),
+    });
+
+    if (!script) {
+      throw new Error("Không tìm thấy kịch bản");
+    }
+
+    return script;
+  } catch (error) {
+    console.error("Error in getScriptById:", error);
+    throw error;
+  } finally {
+    await client.close();
+  }
+};
+
+// Cập nhật nội dung kịch bản
+exports.updateScript = async (scriptId, content, status, adjustmentMode) => {
+  try {
+    await client.connect();
+    const db = client.db(dbName);
+    const scriptsCollection = db.collection("topic_scripts");
+
+    const updateData = {
+      updatedAt: new Date(),
+    };
+
+    if (content) updateData.content = content;
+    if (status) updateData.status = status;
+    if (adjustmentMode) updateData.adjustmentMode = adjustmentMode;
+
+    const result = await scriptsCollection.updateOne(
+      { _id: new ObjectId(scriptId) },
+      { $set: updateData }
+    );
+
+    if (result.matchedCount === 0) {
+      throw new Error("Không tìm thấy kịch bản");
+    }
+
+    return {
+      success: true,
+      scriptId,
+      updated: true,
+    };
+  } catch (error) {
+    console.error("Error in updateScript:", error);
+    throw error;
+  } finally {
+    await client.close();
+  }
+};
+
+// Tạo phiên bản kịch bản tự động điều chỉnh
+exports.autoAdjustScript = async (scriptId, adjustment) => {
+  try {
+    // Lấy kịch bản hiện tại
+    const script = await this.getScriptById(scriptId);
+
+    // Tạo prompt để điều chỉnh nội dung
+    const prompt = `Hãy điều chỉnh kịch bản video văn học sau theo yêu cầu: "${adjustment}".
+    
+Kịch bản hiện tại:
+${script.content}
+
+Lưu ý: dựa vào yêu cầu và tạo thành một kịch bản mới.`;
+
+    // Gọi Gemini API để điều chỉnh kịch bản
+    const adjustedContent = await this.generateScript(prompt);
+
+    // Cập nhật kịch bản với nội dung mới
+    return await this.updateScript(
+      scriptId,
+      adjustedContent,
+      "adjusted",
+      "auto"
+    );
+  } catch (error) {
+    console.error("Error in autoAdjustScript:", error);
+    throw error;
+  }
+};

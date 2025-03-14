@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import TopicInput from "../components/TopicInput";
 import WorkInfo from "../components/WorkInfo";
-import StyleSelection from "../components/StyleSelection";
+import StyleSelection, { ContentParams } from "../components/StyleSelection";
 import ScriptPreview from "../components/ScriptPreview";
 import { Style, Work, PreviewResult } from "../types";
 
@@ -12,15 +12,30 @@ const HomePage: React.FC = () => {
   const [suggestedTopics, setSuggestedTopics] = useState<string[]>([]);
   const [styles, setStyles] = useState<Style[]>([]);
   const [selectedStyle, setSelectedStyle] = useState<string>("analysis");
-  //   const [searchResults, setSearchResults] = useState<Work[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [selectedWorks, setSelectedWorks] = useState<Work[]>([]);
   const [previewContent, setPreviewContent] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
-  //   const [savedScriptId, setSavedScriptId] = useState<string>("");
   const [workIds, setWorkIds] = useState<string[]>([]);
+
+  // New state for content adjustment features
+  const [isManualMode, setIsManualMode] = useState<boolean>(false);
+  const [contentParams, setContentParams] = useState<ContentParams>({
+    length: "medium",
+    tone: "formal",
+    complexity: "medium",
+    focusOn: ["themes", "characters"],
+  });
+  const [scriptStatus, setScriptStatus] = useState<string>("draft"); // draft, approved
+
+  const updateContentParams = (params: Partial<ContentParams>) => {
+    setContentParams((prev) => ({
+      ...prev,
+      ...params,
+    }));
+  };
 
   useEffect(() => {
     const fetchSuggestions = async () => {
@@ -54,7 +69,6 @@ const HomePage: React.FC = () => {
       );
       if (response.data.success) {
         const work = response.data.work;
-        // setSearchResults([work]);
         setSelectedWorks([work]);
         setStep(2);
       } else {
@@ -82,12 +96,17 @@ const HomePage: React.FC = () => {
     setIsGenerating(true);
 
     try {
+      const requestData = {
+        topic,
+        style: selectedStyle,
+        // Include manual mode parameters if enabled
+        ...(isManualMode && { contentParams }),
+        isManualMode,
+      };
+
       const response = await axios.post(
         "/api/topics/generate-script",
-        {
-          topic,
-          style: selectedStyle,
-        },
+        requestData,
         {
           headers: {
             "Content-Type": "application/json",
@@ -99,6 +118,7 @@ const HomePage: React.FC = () => {
         const result: PreviewResult = response.data;
         setPreviewContent(result.preview);
         setWorkIds(result.workIds || []);
+        setScriptStatus("draft");
         setStep(4);
       } else {
         setError("Không thể tạo kịch bản xem trước");
@@ -111,7 +131,7 @@ const HomePage: React.FC = () => {
     }
   };
 
-  const saveScript = async () => {
+  const saveScript = async (content: string, isApproved: boolean) => {
     setError("");
     setIsSaving(true);
 
@@ -119,12 +139,14 @@ const HomePage: React.FC = () => {
       const response = await axios.post("/api/topics/save-script", {
         topic,
         style: selectedStyle,
-        content: previewContent,
+        content,
         workIds,
+        status: isApproved ? "approved" : "draft",
+        contentParams: isManualMode ? contentParams : undefined,
       });
 
       if (response.data.success) {
-        // setSavedScriptId(response.data.scriptId);
+        setScriptStatus(isApproved ? "approved" : "draft");
         setStep(5);
       } else {
         setError("Không thể lưu kịch bản");
@@ -142,8 +164,15 @@ const HomePage: React.FC = () => {
     setSelectedWorks([]);
     setSelectedStyle("analysis");
     setPreviewContent("");
-    // setSavedScriptId("");
     setWorkIds([]);
+    setIsManualMode(false);
+    setContentParams({
+      length: "medium",
+      tone: "formal",
+      complexity: "medium",
+      focusOn: ["themes", "characters"],
+    });
+    setScriptStatus("draft");
     setError("");
     setStep(1);
   };
@@ -192,6 +221,10 @@ const HomePage: React.FC = () => {
           styles={styles}
           selectedStyle={selectedStyle}
           setSelectedStyle={setSelectedStyle}
+          isManualMode={isManualMode}
+          setIsManualMode={setIsManualMode}
+          contentParams={contentParams}
+          updateContentParams={updateContentParams}
           goBack={goBack}
           generatePreview={generatePreview}
           isGenerating={isGenerating}
@@ -225,7 +258,9 @@ const HomePage: React.FC = () => {
 
           <h2 className="text-2xl font-bold mb-2">Kịch bản đã được lưu!</h2>
           <p className="mb-4">
-            Bạn có thể tiếp tục tạo video hoặc tạo kịch bản mới.
+            {scriptStatus === "approved"
+              ? "Kịch bản đã được phê duyệt và sẵn sàng để tạo video."
+              : "Kịch bản đã được lưu như bản nháp. Bạn có thể chỉnh sửa và phê duyệt sau."}
           </p>
 
           <div className="flex justify-center space-x-4">
@@ -236,19 +271,33 @@ const HomePage: React.FC = () => {
               Tạo kịch bản mới
             </button>
 
-            <div className="relative group">
-              <button
-                disabled
-                className="bg-green-600 opacity-50 cursor-not-allowed text-white py-2 px-4 rounded font-medium select-none"
-                onClick={(e) => e.preventDefault()}
-              >
-                Tiếp tục tạo video
-              </button>
-
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 w-48 text-center pointer-events-none">
-                Chức năng này chưa được triển khai
+            {scriptStatus === "approved" ? (
+              <div className="relative group">
+                <button
+                  disabled
+                  className="bg-green-600 opacity-50 cursor-not-allowed text-white py-2 px-4 rounded font-medium select-none"
+                  onClick={(e) => e.preventDefault()}
+                >
+                  Tiếp tục tạo video
+                </button>
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 w-48 text-center pointer-events-none">
+                  Chức năng này chưa được triển khai
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="relative group">
+                <button
+                  disabled
+                  className="bg-green-600 opacity-50 cursor-not-allowed text-white py-2 px-4 rounded font-medium select-none"
+                  onClick={(e) => e.preventDefault()}
+                >
+                  Tiếp tục tạo video
+                </button>
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 w-48 text-center pointer-events-none">
+                  Cần phê duyệt kịch bản trước
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
