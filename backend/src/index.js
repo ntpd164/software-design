@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const connectDb = require("./utils/db");
+const path = require("path");
 const apiRoutes = require("./routes/api");
 
 const app = express();
@@ -10,6 +11,7 @@ connectDb();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, "../public")));
 
 app.use(
   cors({

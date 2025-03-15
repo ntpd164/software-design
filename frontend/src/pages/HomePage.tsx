@@ -4,6 +4,7 @@ import TopicInput from "../components/TopicInput";
 import WorkInfo from "../components/WorkInfo";
 import StyleSelection, { ContentParams } from "../components/StyleSelection";
 import ScriptPreview from "../components/ScriptPreview";
+import VoiceSettings from "../components/VoiceSettings";
 import { Style, Work, PreviewResult } from "../types";
 
 const HomePage: React.FC = () => {
@@ -19,6 +20,10 @@ const HomePage: React.FC = () => {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [workIds, setWorkIds] = useState<string[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [audioUrl, setAudioUrl] = useState<string>("");
+  const [savedScriptId, setSavedScriptId] = useState<string>("");
+  const [editedScriptContent, setEditedScriptContent] = useState<string>("");
 
   // New state for content adjustment features
   const [isManualMode, setIsManualMode] = useState<boolean>(false);
@@ -120,6 +125,7 @@ const HomePage: React.FC = () => {
         setWorkIds(result.workIds || []);
         setScriptStatus("draft");
         setStep(4);
+        setEditedScriptContent(result.preview);
       } else {
         setError("Không thể tạo kịch bản xem trước");
       }
@@ -135,11 +141,14 @@ const HomePage: React.FC = () => {
     setError("");
     setIsSaving(true);
 
+    // Store the edited content in state
+    setEditedScriptContent(content);
+
     try {
       const response = await axios.post("/api/topics/save-script", {
         topic,
         style: selectedStyle,
-        content,
+        content, // This is the potentially edited content
         workIds,
         status: isApproved ? "approved" : "draft",
         contentParams: isManualMode ? contentParams : undefined,
@@ -147,7 +156,16 @@ const HomePage: React.FC = () => {
 
       if (response.data.success) {
         setScriptStatus(isApproved ? "approved" : "draft");
-        setStep(5);
+        // Store the script ID for voice settings
+        if (response.data.scriptId) {
+          setSavedScriptId(response.data.scriptId);
+        }
+        // If approved, go to voice settings, otherwise to completion
+        if (isApproved) {
+          setStep(6); // Go to voice settings
+        } else {
+          setStep(7); // Go to completion
+        }
       } else {
         setError("Không thể lưu kịch bản");
       }
@@ -157,6 +175,15 @@ const HomePage: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const completeVoiceSettings = () => {
+    setStep(7); // Go to completion step
+  };
+
+  const createVideoWithAudio = () => {
+    // This would be implemented in the next phase
+    alert("Chức năng tạo video sẽ được triển khai trong phiên bản tiếp theo");
   };
 
   const startNewProcess = () => {
@@ -187,7 +214,6 @@ const HomePage: React.FC = () => {
       <h1 className="text-3xl font-bold mb-6 text-center">
         Trình tạo video văn học
       </h1>
-
       {error && (
         <div
           className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"
@@ -196,7 +222,6 @@ const HomePage: React.FC = () => {
           <p>{error}</p>
         </div>
       )}
-
       {step === 1 && (
         <TopicInput
           topic={topic}
@@ -206,7 +231,6 @@ const HomePage: React.FC = () => {
           isSearching={isSearching}
         />
       )}
-
       {step === 2 && selectedWorks[0] && (
         <WorkInfo
           work={selectedWorks[0]}
@@ -214,7 +238,6 @@ const HomePage: React.FC = () => {
           proceedToStyleSelection={proceedToStyleSelection}
         />
       )}
-
       {step === 3 && selectedWorks[0] && (
         <StyleSelection
           selectedWork={selectedWorks[0]}
@@ -230,7 +253,6 @@ const HomePage: React.FC = () => {
           isGenerating={isGenerating}
         />
       )}
-
       {step === 4 && (
         <ScriptPreview
           previewContent={previewContent}
@@ -239,7 +261,6 @@ const HomePage: React.FC = () => {
           isSaving={isSaving}
         />
       )}
-
       {step === 5 && (
         <div className="bg-white rounded-lg shadow-md border-2 border-gray-200 p-6 text-center">
           <div className="text-green-500 mb-4">
@@ -284,6 +305,77 @@ const HomePage: React.FC = () => {
                   Chức năng này chưa được triển khai
                 </div>
               </div>
+            ) : (
+              <div className="relative group">
+                <button
+                  disabled
+                  className="bg-green-600 opacity-50 cursor-not-allowed text-white py-2 px-4 rounded font-medium select-none"
+                  onClick={(e) => e.preventDefault()}
+                >
+                  Tiếp tục tạo video
+                </button>
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 w-48 text-center pointer-events-none">
+                  Cần phê duyệt kịch bản trước
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {step === 6 && (
+        <VoiceSettings
+          scriptId={savedScriptId}
+          scriptContent={editedScriptContent}
+          onComplete={completeVoiceSettings}
+          onBack={() => setStep(4)} // Go back to script preview
+        />
+      )}
+
+      {step === 7 && (
+        <div className="bg-white rounded-lg shadow-md border-2 border-gray-200 p-6 text-center">
+          <div className="text-green-500 mb-4">
+            <svg
+              className="w-16 h-16 mx-auto"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </div>
+
+          <h2 className="text-2xl font-bold mb-2">Kịch bản đã được lưu!</h2>
+          <p className="mb-4">
+            {scriptStatus === "approved"
+              ? "Kịch bản và cài đặt giọng nói đã được phê duyệt và sẵn sàng để tạo video."
+              : "Kịch bản đã được lưu như bản nháp. Bạn có thể chỉnh sửa và phê duyệt sau."}
+          </p>
+
+          {audioUrl && (
+            <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+              <h3 className="font-medium mb-2">Bản xem trước âm thanh:</h3>
+              <audio src={audioUrl} controls className="w-full" />
+            </div>
+          )}
+
+          <div className="flex justify-center space-x-4">
+            <button
+              onClick={startNewProcess}
+              className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded font-medium cursor-pointer"
+            >
+              Tạo kịch bản mới
+            </button>
+
+            {scriptStatus === "approved" ? (
+              <button
+                onClick={createVideoWithAudio}
+                className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded font-medium cursor-pointer"
+              >
+                Tiếp tục tạo video
+              </button>
             ) : (
               <div className="relative group">
                 <button

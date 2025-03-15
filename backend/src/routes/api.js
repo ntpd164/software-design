@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const topicController = require("../controllers/topicController");
+const voiceController = require("../controllers/voiceController");
 
 // Endpoints cho trình tạo video văn học với quy trình mới
 router.get("/topics/suggestions", topicController.getSuggestions);
@@ -17,5 +18,10 @@ router.post(
   topicController.autoAdjustScript
 );
 router.get("/topics/scripts", topicController.getUserScripts);
+
+// Voice generation endpoints
+router.post("/voice/generate", voiceController.generateVoice);
+router.get("/voice/settings", voiceController.getVoiceSettings);
+router.post("/voice/customize", voiceController.customizeVoice);
 
 module.exports = router;
