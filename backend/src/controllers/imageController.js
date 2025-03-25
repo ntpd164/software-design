@@ -82,7 +82,7 @@ exports.generateImage = async (req, res) => {
       prompt,
       imageUrl: result.relativeImagePath,
       metadata: {
-        model: "@cf/bytedance/stable-diffusion-xl-lightning",
+        model: "@cf/stabilityai/stable-diffusion-xl-base-1.0",
         num_inference_steps: 20,
       },
     });

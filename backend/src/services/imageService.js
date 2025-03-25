@@ -2,7 +2,7 @@ const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
-const translate = require("google-translate-api");
+const translate = require("google-translate-api-x");
 
 // Cloudflare API configuration
 const CF_API_TOKEN = "WYrUKlkpHzAQQl7HO_ix5wEJSHCppgYtBDrdrVS-";
@@ -44,7 +44,7 @@ async function generateImage(prompt, scriptId, num_inference_steps = 20) {
     // Step 3: Call Cloudflare API with the enhanced translated prompt
     const response = await axios({
       method: "post",
-      url: `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/ai/run/@cf/bytedance/stable-diffusion-xl-lightning`,
+      url: `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0`,
       headers: {
         Authorization: `Bearer ${CF_API_TOKEN}`,
         "Content-Type": "application/json",
@@ -63,7 +63,7 @@ async function generateImage(prompt, scriptId, num_inference_steps = 20) {
     });
 
     // Create a unique filename
-    const filename = `${uuidv4()}.jpeg`;
+    const filename = `${uuidv4()}.png`;
     const imagePath = path.join(IMAGE_DIR, filename);
 
     // Save the image to disk (binary data)
@@ -113,7 +113,6 @@ async function translateToEnglish(text) {
  * @returns {string} - Enhanced prompt
  */
 function enhancePrompt(originalPrompt) {
-  // Don't enhance already detailed prompts (over 100 chars)
   if (originalPrompt.length > 100) return originalPrompt;
 
   // Add quality boosters and style guidance
@@ -137,7 +136,8 @@ function enhancePrompt(originalPrompt) {
     }
   }
 
-  return `${originalPrompt}, ${selectedBoosters.join(", ")}`;
+  // return `${originalPrompt}, ${selectedBoosters.join(", ")}`;
+  return `${originalPrompt}`;
 }
 
 /**
@@ -162,3 +162,69 @@ module.exports = {
   generateImage,
   deleteImage,
 };
+
+
+// async function generateImage(prompt, num_steps = 8) {
+//   if (!prompt) {
+//     throw new Error("Prompt is required for image generation");
+//   }
+
+//   console.log(
+//     `Generating image with prompt: "${prompt}" using ${num_steps} steps`
+//   );
+
+//   try {
+//     // Call Cloudflare API
+//     const response = await axios({
+//       method: "post",
+//       url: `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
+//       headers: {
+//         Authorization: `Bearer ${CF_API_TOKEN}`,
+//         "Content-Type": "application/json",
+//       },
+//       data: {
+//         prompt,
+//         num_steps, // Using 8 steps for best quality as requested
+//       },
+//     });
+
+//     // Check if the API call was successful
+//     if (!response.data.success) {
+//       console.error("Cloudflare API error:", response.data.errors);
+//       throw new Error(
+//         `Cloudflare API error: ${JSON.stringify(response.data.errors)}`
+//       );
+//     }
+
+//     // Extract base64 image data
+//     const base64Data = response.data.result.image;
+
+//     // Convert base64 to buffer
+//     const buffer = Buffer.from(base64Data, "base64");
+
+//     // Create a unique filename
+//     const filename = `image-${uuidv4()}.jpeg`;
+//     const imagePath = path.join(IMAGE_DIR, filename);
+
+//     // Save the image to disk
+//     fs.writeFileSync(imagePath, buffer);
+
+//     console.log(`Image saved to: ${imagePath}`);
+
+//     // Return the relative path and base64 data
+//     return {
+//       success: true,
+//       imagePath,
+//       relativeImagePath: `/images/${filename}`,
+//       base64Data,
+//     };
+//   } catch (error) {
+//     console.error("Error generating image:", error);
+
+//     if (error.response) {
+//       console.error("API response:", error.response.data);
+//     }
+
+//     throw new Error(`Failed to generate image: ${error.message}`);
+//   }
+// }
