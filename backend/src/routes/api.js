@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const topicController = require("../controllers/topicController");
 const voiceController = require("../controllers/voiceController");
+const imageController = require("../controllers/imageController");
 
 // Endpoints cho trình tạo video văn học với quy trình mới
 router.get("/topics/suggestions", topicController.getSuggestions);
@@ -23,5 +24,10 @@ router.get("/topics/scripts", topicController.getUserScripts);
 router.post("/voice/generate", voiceController.generateVoice);
 router.get("/voice/settings", voiceController.getVoiceSettings);
 router.post("/voice/customize", voiceController.customizeVoice);
+
+// Image generation endpoints with Cloudflare Flux
+router.post("/images/generate", imageController.generateImage);
+router.get("/images/script/:scriptId", imageController.getImagesByScript);
+router.delete("/images/:id", imageController.deleteImage);
 
 module.exports = router;
