@@ -108,36 +108,84 @@ async function translateToEnglish(text) {
 }
 
 /**
- * Enhance a prompt to get better image generation results
+ * Enhanced prompt engineering for better image generation results
  * @param {string} originalPrompt - The user's original prompt
- * @returns {string} - Enhanced prompt
+ * @returns {string} - Enhanced prompt optimized for image generation
  */
 function enhancePrompt(originalPrompt) {
+  // Skip enhancement for already detailed prompts
   if (originalPrompt.length > 100) return originalPrompt;
-
-  // Add quality boosters and style guidance
+  
+  // Detect prompt type to apply appropriate enhancements
+  const promptType = detectPromptType(originalPrompt.toLowerCase());
+  
+  // Quality boosters (general improvements)
   const qualityBoosters = [
-    "detailed",
-    "high quality",
-    "masterpiece",
-    "professional",
-    "sharp focus",
-    "highly detailed",
-    "intricate details",
+    "detailed", "high quality", "masterpiece", "professional", 
+    "sharp focus", "highly detailed", "intricate details", "4k", "8k"
   ];
-
-  // Select 2-3 random boosters to avoid repetition
+  
+  // Style boosters (depend on prompt type)
+  const styleModifiers = {
+    portrait: ["professional portrait", "studio lighting", "dramatic lighting", "perfect composition"],
+    landscape: ["scenic view", "golden hour", "beautiful sky", "atmospheric", "panoramic view"],
+    animal: ["wildlife photography", "natural habitat", "perfect focus", "detailed fur/feathers"],
+    fantasy: ["fantasy art", "epic scene", "magical atmosphere", "digital painting"],
+    sci_fi: ["futuristic", "sci-fi aesthetic", "cinematic", "concept art", "matte painting"],
+    cyberpunk: ["neon lighting", "futuristic city", "high contrast", "digital art", "cinematic"],
+    anime: ["anime style", "cel shaded", "vibrant colors", "illustrated"]
+  };
+  
+  // Select 2-3 random quality boosters
   const selectedBoosters = [];
   for (let i = 0; i < 3; i++) {
-    const booster =
-      qualityBoosters[Math.floor(Math.random() * qualityBoosters.length)];
+    const booster = qualityBoosters[Math.floor(Math.random() * qualityBoosters.length)];
     if (!selectedBoosters.includes(booster)) {
       selectedBoosters.push(booster);
     }
   }
+  
+  // Add 1-2 style-specific modifiers if applicable
+  if (styleModifiers[promptType]) {
+    const styleOptions = styleModifiers[promptType];
+    for (let i = 0; i < 2; i++) {
+      if (styleOptions.length > 0) {
+        const styleIndex = Math.floor(Math.random() * styleOptions.length);
+        const style = styleOptions[styleIndex];
+        selectedBoosters.push(style);
+        // Remove to avoid duplication
+        styleOptions.splice(styleIndex, 1);
+      }
+    }
+  }
+  
+  // Join all enhancements with original prompt
+  return `${originalPrompt}, ${selectedBoosters.join(", ")}`;
+}
 
-  // return `${originalPrompt}, ${selectedBoosters.join(", ")}`;
-  return `${originalPrompt}`;
+/**
+ * Detect the type of image requested in the prompt
+ * @param {string} prompt - Lowercase prompt text
+ * @returns {string} - Detected prompt type
+ */
+function detectPromptType(prompt) {
+  if (/(person|portrait|face|man|woman|girl|boy|human)/i.test(prompt)) {
+    return "portrait";
+  } else if (/(landscape|scenery|mountain|forest|beach|nature|sunset|vista)/i.test(prompt)) {
+    return "landscape";
+  } else if (/(cat|dog|bird|animal|pet|wildlife|creature)/i.test(prompt)) {
+    return "animal";
+  } else if (/(fantasy|magic|wizard|dragon|mythical|myth|elf|dwarf|fairy)/i.test(prompt)) {
+    return "fantasy";
+  } else if (/(future|spacecraft|space|sci-fi|science fiction|planet)/i.test(prompt)) {
+    return "sci_fi";
+  } else if (/(cyberpunk|neon|dystopian|cyber|techno|hacker)/i.test(prompt)) {
+    return "cyberpunk";
+  } else if (/(anime|manga|cartoon|stylized|illustration)/i.test(prompt)) {
+    return "anime";
+  }
+  
+  return "general"; // Default type
 }
 
 /**
