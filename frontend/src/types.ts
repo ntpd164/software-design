@@ -23,3 +23,11 @@ export interface ContentParams {
   complexity: string;
   focusOn: string[];
 }
+
+export interface Image{
+  _id: string;
+  imageUrl: string;
+  prompt: string;
+  createdAt: string;
+  scriptId: string;
+}

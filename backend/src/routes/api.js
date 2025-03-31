@@ -26,8 +26,9 @@ router.get("/voice/settings", voiceController.getVoiceSettings);
 router.post("/voice/customize", voiceController.customizeVoice);
 
 // Image generation endpoints with Cloudflare Flux
-router.post("/images/generate", imageController.generateImage);
 router.get("/images/script/:scriptId", imageController.getImagesByScript);
 router.delete("/images/:id", imageController.deleteImage);
+router.post("/images/generate/:scriptId", imageController.generateImageFromScript);
+router.post("/images/regenerate/:scriptId", imageController.regenerateImage);
 
 module.exports = router;

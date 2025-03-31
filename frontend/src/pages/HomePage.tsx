@@ -5,7 +5,8 @@ import WorkInfo from "../components/WorkInfo";
 import StyleSelection, { ContentParams } from "../components/StyleSelection";
 import ScriptPreview from "../components/ScriptPreview";
 import VoiceSettings from "../components/VoiceSettings";
-import { Style, Work, PreviewResult } from "../types";
+import ImageCreation from "../components/ImageCreation";
+import { Style, Work, PreviewResult, Image } from "../types";
 
 const HomePage: React.FC = () => {
   const [step, setStep] = useState<number>(1);
@@ -34,6 +35,48 @@ const HomePage: React.FC = () => {
     focusOn: ["themes", "characters"],
   });
   const [scriptStatus, setScriptStatus] = useState<string>("draft"); // draft, approved
+
+  // State variables for image creation
+  const [imageStyles] = useState([
+    {
+      id: "painting",
+      name: "Tranh vẽ",
+      description: "Phong cách tranh vẽ nghệ thuật truyền thống",
+      styleModifier: "artistic painting, oil painting style, canvas texture",
+    },
+    {
+      id: "classic",
+      name: "Cổ điển",
+      description: "Phong cách hình ảnh cổ điển, hoài niệm",
+      styleModifier: "classic photography, vintage style, historical aesthetic",
+    },
+    {
+      id: "modern",
+      name: "Hiện đại",
+      description: "Phong cách hình ảnh hiện đại, sắc nét",
+      styleModifier: "modern photography, sharp details, contemporary style",
+    },
+    {
+      id: "anime",
+      name: "Hoạt hình",
+      description: "Phong cách anime/manga Nhật Bản",
+      styleModifier:
+        "anime style, vibrant colors, cel shaded, manga illustration",
+    },
+    {
+      id: "3d",
+      name: "3D Render",
+      description: "Hình ảnh được render 3D chất lượng cao",
+      styleModifier:
+        "3D rendering, high quality CG, octane render, detailed texture",
+    },
+  ]);
+  const [selectedImageStyle, setSelectedImageStyle] = useState<string | null>(
+    null
+  );
+  const [isGeneratingImages, setIsGeneratingImages] = useState(false);
+  const [generatedImages, setGeneratedImages] = useState<Image[]>([]);
+  const [imageError, setImageError] = useState("");
 
   const updateContentParams = (params: Partial<ContentParams>) => {
     setContentParams((prev) => ({
@@ -183,7 +226,7 @@ const HomePage: React.FC = () => {
 
   const createVideoWithAudio = () => {
     // This would be implemented in the next phase
-    alert("Chức năng tạo video sẽ được triển khai trong phiên bản tiếp theo");
+    setStep(8);
   };
 
   const startNewProcess = () => {
@@ -392,6 +435,27 @@ const HomePage: React.FC = () => {
             )}
           </div>
         </div>
+      )}
+
+      {step === 8 && (
+        <ImageCreation
+          scriptId={savedScriptId}
+          onBack={() => setStep(7)}
+          onContinue={() =>
+            alert(
+              "Chức năng tạo video sẽ được triển khai trong phiên bản tiếp theo"
+            )
+          }
+          imageStyles={imageStyles}
+          selectedImageStyle={selectedImageStyle}
+          setSelectedImageStyle={setSelectedImageStyle}
+          isGeneratingImages={isGeneratingImages}
+          setIsGeneratingImages={setIsGeneratingImages}
+          generatedImages={generatedImages}
+          setGeneratedImages={setGeneratedImages}
+          imageError={imageError}
+          setImageError={setImageError}
+        />
       )}
     </div>
   );

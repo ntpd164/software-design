@@ -21,9 +21,15 @@ if (!fs.existsSync(IMAGE_DIR)) {
  * @param {string} prompt - The text prompt in any language
  * @param {string} scriptId - Script ID for reference (not used in the API call)
  * @param {number} num_inference_steps - Number of inference steps (higher = better quality)
+ * @param {string} style - Optional style modifier (e.g., "oil painting", "anime style")
  * @returns {Promise<Object>} Object containing the image path
  */
-async function generateImage(prompt, scriptId, num_inference_steps = 20) {
+async function generateImage(
+  prompt,
+  scriptId,
+  style = null,
+  num_inference_steps = 20
+) {
   if (!prompt) {
     throw new Error("Prompt is required for image generation");
   }
@@ -31,15 +37,11 @@ async function generateImage(prompt, scriptId, num_inference_steps = 20) {
   try {
     // Step 1: Translate prompt to English if not already in English
     const translatedPrompt = await translateToEnglish(prompt);
-    console.log(`Original prompt: "${prompt}"`);
 
-    if (translatedPrompt !== prompt) {
-      console.log(`Translated prompt: "${translatedPrompt}"`);
-    }
-
-    // Step 2: Enhance the translated prompt
-    const enhancedPrompt = enhancePrompt(translatedPrompt);
-    console.log(`Enhanced prompt: "${enhancedPrompt}"`);
+    // Step 2: Enhance the translated prompt with optional style
+    const enhancedPrompt = style
+      ? enhancePromptWithStyle(translatedPrompt, style)
+      : enhancePrompt(translatedPrompt);
 
     // Step 3: Call Cloudflare API with the enhanced translated prompt
     const response = await axios({
@@ -79,6 +81,7 @@ async function generateImage(prompt, scriptId, num_inference_steps = 20) {
       originalPrompt: prompt,
       translatedPrompt: translatedPrompt !== prompt ? translatedPrompt : null,
       enhancedPrompt,
+      style: style || null,
     };
   } catch (error) {
     console.error("Error generating image:", error);
@@ -90,6 +93,79 @@ async function generateImage(prompt, scriptId, num_inference_steps = 20) {
 
     throw new Error(`Failed to generate image: ${error.message}`);
   }
+}
+
+/**
+ * Enhance prompt with specific style preferences
+ * @param {string} originalPrompt - The user's original prompt
+ * @param {string} style - Style modifier (e.g., "oil painting", "anime style")
+ * @returns {string} - Enhanced prompt optimized for image generation with style
+ */
+function enhancePromptWithStyle(originalPrompt, style) {
+  // Skip enhancement for already detailed prompts
+  if (originalPrompt.length > 100 && style.length > 20) {
+    // If both prompt and style are detailed, just combine them
+    return `${originalPrompt}, ${style}`;
+  }
+
+  // Detect prompt type to apply appropriate enhancements
+  const promptType = detectPromptType(originalPrompt.toLowerCase());
+
+  // Quality boosters (general improvements)
+  const qualityBoosters = [
+    "detailed",
+    "high quality",
+    "masterpiece",
+    "professional",
+    "sharp focus",
+    "highly detailed",
+  ];
+
+  // Select 1-2 random quality boosters (fewer than before to emphasize style more)
+  const selectedBoosters = [];
+  for (let i = 0; i < 2; i++) {
+    const booster =
+      qualityBoosters[Math.floor(Math.random() * qualityBoosters.length)];
+    if (!selectedBoosters.includes(booster)) {
+      selectedBoosters.push(booster);
+    }
+  }
+
+  // Join all enhancements with original prompt, prioritizing style
+  return `${originalPrompt}, ${style}, ${selectedBoosters.join(", ")}`;
+}
+
+/**
+ * Detect the type of image requested in the prompt
+ * @param {string} prompt - Lowercase prompt text
+ * @returns {string} - Detected prompt type
+ */
+function detectPromptType(prompt) {
+  if (/(person|portrait|face|man|woman|girl|boy|human)/i.test(prompt)) {
+    return "portrait";
+  } else if (
+    /(landscape|scenery|mountain|forest|beach|nature|sunset|vista)/i.test(
+      prompt
+    )
+  ) {
+    return "landscape";
+  } else if (/(cat|dog|bird|animal|pet|wildlife|creature)/i.test(prompt)) {
+    return "animal";
+  } else if (
+    /(fantasy|magic|wizard|dragon|mythical|myth|elf|dwarf|fairy)/i.test(prompt)
+  ) {
+    return "fantasy";
+  } else if (
+    /(future|spacecraft|space|sci-fi|science fiction|planet)/i.test(prompt)
+  ) {
+    return "sci_fi";
+  } else if (/(cyberpunk|neon|dystopian|cyber|techno|hacker)/i.test(prompt)) {
+    return "cyberpunk";
+  } else if (/(anime|manga|cartoon|stylized|illustration)/i.test(prompt)) {
+    return "anime";
+  }
+
+  return "general"; // Default type
 }
 
 /**
@@ -108,84 +184,40 @@ async function translateToEnglish(text) {
 }
 
 /**
- * Enhanced prompt engineering for better image generation results
- * @param {string} originalPrompt - The user's original prompt
- * @returns {string} - Enhanced prompt optimized for image generation
+ * Parse image descriptions from the formatted prompt output
+ * @param {string} promptOutput - Formatted text from Gemini prompt response
+ * @returns {Array<string>} - Array of individual image descriptions
  */
-function enhancePrompt(originalPrompt) {
-  // Skip enhancement for already detailed prompts
-  if (originalPrompt.length > 100) return originalPrompt;
+function parseImageDescriptions(promptOutput) {
+  if (!promptOutput) return [];
   
-  // Detect prompt type to apply appropriate enhancements
-  const promptType = detectPromptType(originalPrompt.toLowerCase());
+  console.log("Parsing prompt output for image descriptions...");
   
-  // Quality boosters (general improvements)
-  const qualityBoosters = [
-    "detailed", "high quality", "masterpiece", "professional", 
-    "sharp focus", "highly detailed", "intricate details", "4k", "8k"
-  ];
+  // Check if we have the expected format (list of bullet points)
+  if (promptOutput.includes("Dưới đây là danh sách các mô tả hình ảnh") || 
+      promptOutput.includes("- ")) {
+    
+    // Split by newlines and filter lines that start with dash (-)
+    const lines = promptOutput.split('\n')
+      .filter(line => line.trim().startsWith('-'))
+      .map(line => line.replace(/^-\s*/, '').trim()) // Remove dash prefix and trim
+      .filter(line => line.length > 0); // Remove empty lines
+    
+    console.log(`Found ${lines.length} image descriptions`);
+    return lines;
+  } 
   
-  // Style boosters (depend on prompt type)
-  const styleModifiers = {
-    portrait: ["professional portrait", "studio lighting", "dramatic lighting", "perfect composition"],
-    landscape: ["scenic view", "golden hour", "beautiful sky", "atmospheric", "panoramic view"],
-    animal: ["wildlife photography", "natural habitat", "perfect focus", "detailed fur/feathers"],
-    fantasy: ["fantasy art", "epic scene", "magical atmosphere", "digital painting"],
-    sci_fi: ["futuristic", "sci-fi aesthetic", "cinematic", "concept art", "matte painting"],
-    cyberpunk: ["neon lighting", "futuristic city", "high contrast", "digital art", "cinematic"],
-    anime: ["anime style", "cel shaded", "vibrant colors", "illustrated"]
-  };
+  // Fallback: try to extract anything that looks like an image description
+  // This is in case the format changes slightly
+  const possibleDescriptions = promptOutput.split('\n')
+    .filter(line => line.trim().length > 0)
+    .filter(line => !line.includes("Dưới đây là danh sách") && 
+                    !line.includes("mô tả hình ảnh") &&
+                    !line.startsWith('#'))
+    .map(line => line.replace(/^-\s*/, '').trim());
   
-  // Select 2-3 random quality boosters
-  const selectedBoosters = [];
-  for (let i = 0; i < 3; i++) {
-    const booster = qualityBoosters[Math.floor(Math.random() * qualityBoosters.length)];
-    if (!selectedBoosters.includes(booster)) {
-      selectedBoosters.push(booster);
-    }
-  }
-  
-  // Add 1-2 style-specific modifiers if applicable
-  if (styleModifiers[promptType]) {
-    const styleOptions = styleModifiers[promptType];
-    for (let i = 0; i < 2; i++) {
-      if (styleOptions.length > 0) {
-        const styleIndex = Math.floor(Math.random() * styleOptions.length);
-        const style = styleOptions[styleIndex];
-        selectedBoosters.push(style);
-        // Remove to avoid duplication
-        styleOptions.splice(styleIndex, 1);
-      }
-    }
-  }
-  
-  // Join all enhancements with original prompt
-  return `${originalPrompt}, ${selectedBoosters.join(", ")}`;
-}
-
-/**
- * Detect the type of image requested in the prompt
- * @param {string} prompt - Lowercase prompt text
- * @returns {string} - Detected prompt type
- */
-function detectPromptType(prompt) {
-  if (/(person|portrait|face|man|woman|girl|boy|human)/i.test(prompt)) {
-    return "portrait";
-  } else if (/(landscape|scenery|mountain|forest|beach|nature|sunset|vista)/i.test(prompt)) {
-    return "landscape";
-  } else if (/(cat|dog|bird|animal|pet|wildlife|creature)/i.test(prompt)) {
-    return "animal";
-  } else if (/(fantasy|magic|wizard|dragon|mythical|myth|elf|dwarf|fairy)/i.test(prompt)) {
-    return "fantasy";
-  } else if (/(future|spacecraft|space|sci-fi|science fiction|planet)/i.test(prompt)) {
-    return "sci_fi";
-  } else if (/(cyberpunk|neon|dystopian|cyber|techno|hacker)/i.test(prompt)) {
-    return "cyberpunk";
-  } else if (/(anime|manga|cartoon|stylized|illustration)/i.test(prompt)) {
-    return "anime";
-  }
-  
-  return "general"; // Default type
+  console.log(`Fallback found ${possibleDescriptions.length} possible descriptions`);
+  return possibleDescriptions;
 }
 
 /**
@@ -209,8 +241,8 @@ async function deleteImage(imagePath) {
 module.exports = {
   generateImage,
   deleteImage,
+  parseImageDescriptions,
 };
-
 
 // async function generateImage(prompt, num_steps = 8) {
 //   if (!prompt) {
