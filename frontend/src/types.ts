@@ -29,5 +29,6 @@ export interface Image{
   imageUrl: string;
   prompt: string;
   createdAt: string;
+  updatedAt: string;
   scriptId: string;
 }

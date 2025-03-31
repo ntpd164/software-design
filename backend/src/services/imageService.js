@@ -215,8 +215,7 @@ function parseImageDescriptions(promptOutput) {
                     !line.includes("mô tả hình ảnh") &&
                     !line.startsWith('#'))
     .map(line => line.replace(/^-\s*/, '').trim());
-  
-  console.log(`Fallback found ${possibleDescriptions.length} possible descriptions`);
+
   return possibleDescriptions;
 }
 

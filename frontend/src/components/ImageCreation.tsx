@@ -626,7 +626,7 @@ const ImageCreation: React.FC<ImageCreationProps> = ({
                     {image.prompt.length > 60 ? "..." : ""}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    {new Date(image.createdAt).toLocaleString("vi-VN", {
+                    {new Date(image.updatedAt || image.createdAt).toLocaleString("vi-VN", {
                       hour: "2-digit",
                       minute: "2-digit",
                     })}
@@ -722,7 +722,7 @@ const ImageCreation: React.FC<ImageCreationProps> = ({
                 </p>
                 <p className="text-xs text-gray-500 mt-2">
                   Tạo lúc:{" "}
-                  {new Date(previewImage.createdAt).toLocaleString("vi-VN")}
+                  {new Date(previewImage.updatedAt || previewImage.createdAt).toLocaleString("vi-VN")}
                 </p>
               </div>
             </div>
