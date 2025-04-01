@@ -1,4 +1,5 @@
 const axios = require("axios");
+const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
@@ -7,6 +8,7 @@ const {
   generateImage,
   deleteImage,
   parseImageDescriptions,
+  replaceImage
 } = require("../services/imageService");
 const { getImageScript } = require("../services/geminiService");
 const Image = require("../models/imageModel");
@@ -25,6 +27,32 @@ const client = new MongoClient(uri);
 if (!fs.existsSync(IMAGE_DIR)) {
   fs.mkdirSync(IMAGE_DIR, { recursive: true });
 }
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadPath = path.join(process.cwd(), "public/images");
+    fs.mkdirSync(uploadPath, { recursive: true });
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    // Keep original filename but make it unique
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname);
+    cb(null, uniqueSuffix + ext);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // Limit to 10MB
+  fileFilter: function (req, file, cb) {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ext !== ".jpg" && ext !== ".jpeg" && ext !== ".png") {
+      return cb(new Error("Only .jpg, .jpeg, and .png files are allowed"));
+    }
+    cb(null, true);
+  },
+})
 
 /**
  * Generate an image based on a prompt and add to database
@@ -295,108 +323,22 @@ exports.regenerateImage = async (req, res) => {
       throw new Error("Failed to generate new image");
     }
 
-    // Check if we have valid paths
-    if (!originalImage.imageUrl) {
-      return res.status(500).json({
-        success: false,
-        message: "Original image URL is undefined",
-      });
-    }
-
-    if (!result.relativeImagePath) {
-      return res.status(500).json({
-        success: false,
-        message: "New image path is undefined",
-      });
-    }
-
-    // Get the file paths - Fix the property name: relativeImagePath vs imageUrl
-    const originalPath = path.join(
-      process.cwd(),
-      "public",
-      originalImage.imageUrl
-    );
-    const newPath = path.join(
-      process.cwd(),
-      "public",
-      result.relativeImagePath
-    );
-
-    console.log(`Original path: ${originalPath}`);
-    console.log(`New path: ${newPath}`);
-
     try {
-      // Make sure directory exists
-      fs.mkdirSync(path.dirname(originalPath), { recursive: true });
-
-      // Copy new image to old path
-      fs.copyFileSync(newPath, originalPath);
-
-      // Delete new image file
-      fs.unlinkSync(newPath);
-
-      console.log("File replaced successfully");
-
-      // Update timestamp but keep same path
-      const updatedImage = await Image.findByIdAndUpdate(
-        imageId,
-        { updatedAt: new Date() },
-        { new: true }
-      );
-
-      // Update MongoDB document in topic_scripts collection
+      // Connect to MongoDB
       await client.connect();
-      const database = client.db(dbName);
-      await database.collection("topic_scripts").updateOne(
-        {
-          _id: new ObjectId(scriptId),
-          "images._id": new ObjectId(imageId),
-        },
-        {
-          $set: {
-            "images.$.updatedAt": new Date(),
-          },
-        }
+
+      // Use the reusable replaceImage function
+      const replacementResult = await replaceImage(
+        originalImage,
+        result.relativeImagePath,
+        scriptId,
+        client
       );
 
       res.status(200).json({
         success: true,
-        message: "Image regenerated successfully",
-        data: updatedImage,
-      });
-    } catch (fsError) {
-      console.error("File operation error:", fsError);
-
-      // If file operations fail, just update the path
-      const updatedImage = await Image.findByIdAndUpdate(
-        imageId,
-        {
-          imageUrl: result.relativeImagePath,
-          updatedAt: new Date(),
-        },
-        { new: true }
-      );
-
-      // Update MongoDB document in topic_scripts collection
-      await client.connect();
-      const database = client.db(dbName);
-      await database.collection("topic_scripts").updateOne(
-        {
-          _id: new ObjectId(scriptId),
-          "images._id": new ObjectId(imageId),
-        },
-        {
-          $set: {
-            "images.$.imageUrl": result.relativeImagePath,
-            "images.$.updatedAt": new Date(),
-          },
-        }
-      );
-
-      return res.status(200).json({
-        success: true,
-        message: "Image regenerated with new path",
-        data: updatedImage,
+        message: `Image regenerated successfully using ${replacementResult.result.method} method`,
+        data: replacementResult.updatedImage,
       });
     } finally {
       if (client) {
@@ -408,6 +350,89 @@ exports.regenerateImage = async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message || "Failed to regenerate image",
+    });
+  }
+};
+
+/**
+ * Replace an image with an uploaded file
+ */
+exports.uploadReplaceImage = async (req, res) => {
+  try {
+    // Use multer middleware for single file upload
+    upload.single('image')(req, res, async function(err) {
+      if (err) {
+        return res.status(400).json({
+          success: false,
+          message: err.message || 'Error uploading file'
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'No file uploaded'
+        });
+      }
+
+      const { scriptId } = req.params;
+      const { imageId } = req.body;
+
+      if (!scriptId || !imageId) {
+        // Remove uploaded file if params are missing
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({
+          success: false,
+          message: 'Missing scriptId or imageId'
+        });
+      }
+
+      // Find the original image
+      const originalImage = await Image.findById(imageId);
+      if (!originalImage) {
+        // Remove uploaded file if original image not found
+        fs.unlinkSync(req.file.path);
+        return res.status(404).json({
+          success: false,
+          message: 'Original image not found'
+        });
+      }
+
+      // Store relative path for database
+      const relativePath = `/images/${path.basename(req.file.path)}`;
+
+      try {
+        // Connect to MongoDB
+        await client.connect();
+        
+        // Use the reusable replaceImage function
+        const replacementResult = await replaceImage(
+          originalImage, 
+          relativePath,
+          scriptId,
+          client
+        );
+        
+        return res.status(200).json({
+          success: true,
+          message: `Image replaced successfully using ${replacementResult.result.method} method`,
+          data: replacementResult.updatedImage
+        });
+      } catch (error) {
+        console.error('Error replacing image:', error);
+        return res.status(500).json({
+          success: false,
+          message: error.message || 'Failed to replace image'
+        });
+      } finally {
+        if (client) await client.close();
+      }
+    });
+  } catch (error) {
+    console.error('Error in upload controller:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to process upload'
     });
   }
 };

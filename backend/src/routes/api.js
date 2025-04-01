@@ -30,5 +30,6 @@ router.get("/images/script/:scriptId", imageController.getImagesByScript);
 router.delete("/images/:id", imageController.deleteImage);
 router.post("/images/generate/:scriptId", imageController.generateImageFromScript);
 router.post("/images/regenerate/:scriptId", imageController.regenerateImage);
+router.post("/images/upload/:scriptId", imageController.uploadReplaceImage);
 
 module.exports = router;

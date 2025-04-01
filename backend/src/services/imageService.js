@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
 const translate = require("google-translate-api-x");
+const { ObjectId } = require("mongodb");
 
 // Cloudflare API configuration
 const CF_API_TOKEN = "WYrUKlkpHzAQQl7HO_ix5wEJSHCppgYtBDrdrVS-";
@@ -220,6 +221,116 @@ function parseImageDescriptions(promptOutput) {
 }
 
 /**
+ * Replace an existing image with a new one
+ * @param {Object} originalImage - The original image document from MongoDB
+ * @param {string} newImagePath - Path to the new image file
+ * @param {string} scriptId - ID of the script the image belongs to
+ * @param {MongoDB.Client} dbClient - MongoDB client instance
+ * @returns {Promise<Object>} Updated image document and status information
+ */
+async function replaceImage(originalImage, newImagePath, scriptId, dbClient) {
+  if (!originalImage || !originalImage.imageUrl) {
+    throw new Error("Original image is invalid or missing URL");
+  }
+
+  if (!newImagePath) {
+    throw new Error("New image path is required");
+  }
+  
+  // Get the file paths
+  const originalPath = path.join(
+    process.cwd(),
+    "public",
+    originalImage.imageUrl
+  );
+  
+  const newPath = path.join(
+    process.cwd(),
+    "public",
+    newImagePath
+  );
+
+  console.log(`Original path: ${originalPath}`);
+  console.log(`New path: ${newPath}`);
+  
+  let updatedImage;
+  let result = {
+    method: "replace", // Will be either "replace" (copied file) or "path_update" (changed path in DB)
+    originalPath,
+    newPath
+  };
+
+  try {
+    // Make sure directory exists
+    fs.mkdirSync(path.dirname(originalPath), { recursive: true });
+
+    // Copy new image to old path
+    fs.copyFileSync(newPath, originalPath);
+
+    // Delete new image file
+    fs.unlinkSync(newPath);
+
+    console.log("File replaced successfully");
+    
+    // Update timestamp but keep same path
+    updatedImage = await originalImage.constructor.findByIdAndUpdate(
+      originalImage._id,
+      { updatedAt: new Date() },
+      { new: true }
+    );
+
+    // Update MongoDB document in topic_scripts collection
+    const database = dbClient.db("literature_db");
+    await database.collection("topic_scripts").updateOne(
+      { 
+        _id: new ObjectId(scriptId),
+        "images._id": new ObjectId(originalImage._id)
+      },
+      {
+        $set: {
+          "images.$.updatedAt": new Date()
+        }
+      }
+    );
+  } catch (fsError) {
+    console.error("File operation error:", fsError);
+    
+    // If file operations fail, just update the path
+    updatedImage = await originalImage.constructor.findByIdAndUpdate(
+      originalImage._id,
+      {
+        imageUrl: newImagePath,
+        updatedAt: new Date()
+      },
+      { new: true }
+    );
+
+    // Update MongoDB document in topic_scripts collection
+    const database = dbClient.db("literature_db");
+    await database.collection("topic_scripts").updateOne(
+      { 
+        _id: new ObjectId(scriptId),
+        "images._id": new ObjectId(originalImage._id)
+      },
+      {
+        $set: {
+          "images.$.imageUrl": newImagePath,
+          "images.$.updatedAt": new Date()
+        }
+      }
+    );
+    
+    result.method = "path_update";
+  }
+  
+  return {
+    success: true,
+    updatedImage,
+    result
+  };
+}
+
+/**
  * Delete an image file from the filesystem
  * @param {string} imagePath - Full path to the image file
  * @returns {Promise<boolean>} Whether the deletion was successful
@@ -241,6 +352,7 @@ module.exports = {
   generateImage,
   deleteImage,
   parseImageDescriptions,
+  replaceImage
 };
 
 // async function generateImage(prompt, num_steps = 8) {

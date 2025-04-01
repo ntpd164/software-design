@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
 import { Image } from "../types";
 
@@ -64,6 +64,12 @@ const ImageCreation: React.FC<ImageCreationProps> = ({
   const [regeneratingImages, setRegeneratingImages] = useState<
     Record<string, boolean>
   >({});
+  // Add these state variables and ref
+  const [uploadingImages, setUploadingImages] = useState<
+    Record<string, boolean>
+  >({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeImageId, setActiveImageId] = useState<string | null>(null);
 
   // Helper function to get correct image URL
   const getImageUrl = (relativePath: string) => {
@@ -319,6 +325,82 @@ const ImageCreation: React.FC<ImageCreationProps> = ({
     console.log("Image generation manually stopped");
   };
 
+  // Add these functions to handle image uploads
+  const handleImageUpload = async (imageId: string, file: File) => {
+    if (!scriptId) return;
+
+    // Set uploading state for this specific image
+    setUploadingImages((prev) => ({ ...prev, [imageId]: true }));
+    setImageError("");
+
+    try {
+      // Create form data for file upload
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("scriptId", scriptId);
+      formData.append("imageId", imageId);
+
+      // Upload the file
+      const response = await axios.post(
+        `/api/images/upload/${scriptId}`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      if (response.data.success) {
+        // Refresh the images to show the new uploaded one
+        fetchImages();
+      } else {
+        setImageError(
+          `Không thể tải lên hình ảnh: ${
+            response.data.message || "Lỗi không xác định"
+          }`
+        );
+      }
+    } catch (err: unknown) {
+      console.error("Error uploading image:", err);
+      if (err && typeof err === "object" && "response" in err) {
+        const errorWithResponse = err as {
+          response?: { data?: { message?: string } };
+        };
+        setImageError(
+          errorWithResponse.response?.data?.message ||
+            "Đã xảy ra lỗi khi tải lên hình ảnh"
+        );
+      } else {
+        setImageError("Đã xảy ra lỗi khi tải lên hình ảnh");
+      }
+    } finally {
+      // Clear uploading state
+      setUploadingImages((prev) => ({ ...prev, [imageId]: false }));
+    }
+  };
+
+  // Function to trigger file selector when upload button is clicked
+  const openFileSelector = (imageId: string) => {
+    setActiveImageId(imageId);
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  // Handle file selection from file dialog
+  const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0 && activeImageId) {
+      handleImageUpload(activeImageId, files[0]);
+    }
+
+    // Reset file input
+    if (e.target) {
+      e.target.value = "";
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md border-2 border-gray-200 p-6">
       <h2 className="text-2xl font-bold mb-4 text-center">
@@ -500,6 +582,43 @@ const ImageCreation: React.FC<ImageCreationProps> = ({
 
                         {/* Image controls */}
                         <div className="absolute top-2 right-2 flex space-x-1">
+                          {/* Upload button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent opening preview
+                              openFileSelector(image._id);
+                            }}
+                            disabled={
+                              uploadingImages[image._id] ||
+                              regeneratingImages[image._id] ||
+                              isGeneratingImages
+                            }
+                            className={`p-1.5 rounded-full ${
+                              uploadingImages[image._id] ||
+                              regeneratingImages[image._id] ||
+                              isGeneratingImages
+                                ? "bg-gray-300 cursor-not-allowed"
+                                : "bg-green-500 hover:bg-green-600"
+                            } text-white shadow-md`}
+                            title="Tải lên hình ảnh thay thế"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                              />
+                            </svg>
+                          </button>
+
+                          {/* Regenerate button */}
                           <button
                             onClick={(e) => {
                               e.stopPropagation(); // Prevent opening preview
@@ -589,6 +708,42 @@ const ImageCreation: React.FC<ImageCreationProps> = ({
 
                   {/* Image controls */}
                   <div className="absolute top-2 right-2 flex space-x-1">
+                    {/* Upload button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent opening preview
+                        openFileSelector(image._id);
+                      }}
+                      disabled={
+                        uploadingImages[image._id] ||
+                        regeneratingImages[image._id] ||
+                        isGeneratingImages
+                      }
+                      className={`p-1.5 rounded-full ${
+                        uploadingImages[image._id] ||
+                        regeneratingImages[image._id] ||
+                        isGeneratingImages
+                          ? "bg-gray-300 cursor-not-allowed"
+                          : "bg-green-500 hover:bg-green-600"
+                      } text-white shadow-md`}
+                      title="Tải lên hình ảnh thay thế"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                        />
+                      </svg>
+                    </button>
+
                     {/* Regenerate button */}
                     <button
                       onClick={(e) => {
@@ -626,7 +781,9 @@ const ImageCreation: React.FC<ImageCreationProps> = ({
                     {image.prompt.length > 60 ? "..." : ""}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    {new Date(image.updatedAt || image.createdAt).toLocaleString("vi-VN", {
+                    {new Date(
+                      image.updatedAt || image.createdAt
+                    ).toLocaleString("vi-VN", {
                       hour: "2-digit",
                       minute: "2-digit",
                     })}
@@ -651,6 +808,39 @@ const ImageCreation: React.FC<ImageCreationProps> = ({
             <div className="p-4 border-b flex justify-between items-center">
               <h3 className="font-bold">Chi tiết hình ảnh</h3>
               <div className="flex space-x-2">
+                {/* Upload button in preview */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openFileSelector(previewImage._id);
+                    closeImagePreview();
+                  }}
+                  disabled={
+                    uploadingImages[previewImage._id] ||
+                    regeneratingImages[previewImage._id]
+                  }
+                  className={`${
+                    uploadingImages[previewImage._id] ||
+                    regeneratingImages[previewImage._id]
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-green-500 hover:bg-green-600"
+                  } text-white py-1 px-2 rounded flex items-center text-sm`}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4 mr-1"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  Tải lên
+                </button>
+
                 {/* Regenerate button in preview */}
                 <button
                   onClick={(e) => {
@@ -722,7 +912,9 @@ const ImageCreation: React.FC<ImageCreationProps> = ({
                 </p>
                 <p className="text-xs text-gray-500 mt-2">
                   Tạo lúc:{" "}
-                  {new Date(previewImage.updatedAt || previewImage.createdAt).toLocaleString("vi-VN")}
+                  {new Date(
+                    previewImage.updatedAt || previewImage.createdAt
+                  ).toLocaleString("vi-VN")}
                 </p>
               </div>
             </div>
@@ -750,6 +942,13 @@ const ImageCreation: React.FC<ImageCreationProps> = ({
           Tiếp tục tạo video
         </button>
       </div>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={onFileSelected}
+        style={{ display: "none" }}
+        accept="image/jpeg,image/png,image/gif,image/webp"
+      />
     </div>
   );
 };
