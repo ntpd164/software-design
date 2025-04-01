@@ -31,5 +31,6 @@ router.delete("/images/:id", imageController.deleteImage);
 router.post("/images/generate/:scriptId", imageController.generateImageFromScript);
 router.post("/images/regenerate/:scriptId", imageController.regenerateImage);
 router.post("/images/upload/:scriptId", imageController.uploadReplaceImage);
+router.post("/images/edit", imageController.editImage);
 
 module.exports = router;

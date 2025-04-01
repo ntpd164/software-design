@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
 import { Image } from "../types";
+import ImageEditor from "./ImageEditor";
 
 // Image style type
 type ImageStyle = {
@@ -70,6 +71,7 @@ const ImageCreation: React.FC<ImageCreationProps> = ({
   >({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeImageId, setActiveImageId] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
 
   // Helper function to get correct image URL
   const getImageUrl = (relativePath: string) => {
@@ -399,6 +401,22 @@ const ImageCreation: React.FC<ImageCreationProps> = ({
     if (e.target) {
       e.target.value = "";
     }
+  };
+
+  const handleSaveEditedImage = async (editedImageBlob: Blob) => {
+    if (!previewImage) return;
+
+    // Convert blob to File
+    const file = new File([editedImageBlob], `edited-image-${Date.now()}.png`, {
+      type: "image/png",
+    });
+
+    // Upload the edited file
+    await handleImageUpload(previewImage._id, file);
+
+    // Exit edit mode and close preview
+    setIsEditing(false);
+    closeImagePreview();
   };
 
   return (
@@ -799,125 +817,157 @@ const ImageCreation: React.FC<ImageCreationProps> = ({
       {previewImage && (
         <div
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50"
-          onClick={closeImagePreview}
+          onClick={!isEditing ? closeImagePreview : undefined}
         >
           <div
             className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-4 border-b flex justify-between items-center">
-              <h3 className="font-bold">Chi tiết hình ảnh</h3>
-              <div className="flex space-x-2">
-                {/* Upload button in preview */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openFileSelector(previewImage._id);
-                    closeImagePreview();
-                  }}
-                  disabled={
-                    uploadingImages[previewImage._id] ||
-                    regeneratingImages[previewImage._id]
-                  }
-                  className={`${
-                    uploadingImages[previewImage._id] ||
-                    regeneratingImages[previewImage._id]
-                      ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-green-500 hover:bg-green-600"
-                  } text-white py-1 px-2 rounded flex items-center text-sm`}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 mr-1"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  Tải lên
-                </button>
+            {!isEditing ? (
+              <>
+                <div className="p-4 border-b flex justify-between items-center">
+                  <h3 className="font-bold">Chi tiết hình ảnh</h3>
+                  <div className="flex space-x-2">
+                    {/* Edit button */}
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="bg-purple-500 hover:bg-purple-600 text-white py-1 px-2 rounded flex items-center text-sm"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4 mr-1"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                        />
+                      </svg>
+                      Chỉnh sửa
+                    </button>
 
-                {/* Regenerate button in preview */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    regenerateImage(previewImage._id, previewImage.prompt);
-                    closeImagePreview();
-                  }}
-                  disabled={regeneratingImages[previewImage._id]}
-                  className={`${
-                    regeneratingImages[previewImage._id]
-                      ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-blue-500 hover:bg-blue-600"
-                  } text-white py-1 px-2 rounded flex items-center text-sm`}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 mr-1"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  Tạo lại
-                </button>
-                {/* Close button */}
-                <button
-                  className="text-gray-500 hover:text-gray-700"
-                  onClick={closeImagePreview}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div className="p-4">
-              <img
-                src={previewImage.imageUrl}
-                alt={previewImage.prompt}
-                className="w-full max-h-[60vh] object-contain mb-4"
-                onError={(e) => {
-                  console.error(
-                    "Image failed to load in preview:",
-                    previewImage.imageUrl
-                  );
-                  e.currentTarget.src =
-                    "https://via.placeholder.com/800x600?text=Image+Not+Found";
-                }}
+                    {/* Upload button in preview */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openFileSelector(previewImage._id);
+                        closeImagePreview();
+                      }}
+                      disabled={
+                        uploadingImages[previewImage._id] ||
+                        regeneratingImages[previewImage._id]
+                      }
+                      className={`${
+                        uploadingImages[previewImage._id] ||
+                        regeneratingImages[previewImage._id]
+                          ? "bg-gray-400 cursor-not-allowed"
+                          : "bg-green-500 hover:bg-green-600"
+                      } text-white py-1 px-2 rounded flex items-center text-sm`}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4 mr-1"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Tải lên
+                    </button>
+
+                    {/* Regenerate button in preview */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        regenerateImage(previewImage._id, previewImage.prompt);
+                        closeImagePreview();
+                      }}
+                      disabled={regeneratingImages[previewImage._id]}
+                      className={`${
+                        regeneratingImages[previewImage._id]
+                          ? "bg-gray-400 cursor-not-allowed"
+                          : "bg-blue-500 hover:bg-blue-600"
+                      } text-white py-1 px-2 rounded flex items-center text-sm`}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4 mr-1"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Tạo lại
+                    </button>
+                    {/* Close button */}
+                    <button
+                      className="text-gray-500 hover:text-gray-700"
+                      onClick={closeImagePreview}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-6 w-6"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div className="p-4">
+                  <img
+                    src={previewImage.imageUrl}
+                    alt={previewImage.prompt}
+                    className="w-full max-h-[60vh] object-contain mb-4"
+                    onError={(e) => {
+                      console.error(
+                        "Image failed to load in preview:",
+                        previewImage.imageUrl
+                      );
+                      e.currentTarget.src =
+                        "https://via.placeholder.com/800x600?text=Image+Not+Found";
+                    }}
+                  />
+                  <div className="bg-gray-50 p-3 rounded-lg mt-3">
+                    <h4 className="font-semibold mb-1 text-sm">Mô tả:</h4>
+                    <p className="text-gray-700 whitespace-pre-line text-sm">
+                      {previewImage.prompt}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Tạo lúc:{" "}
+                      {new Date(
+                        previewImage.updatedAt || previewImage.createdAt
+                      ).toLocaleString("vi-VN")}
+                    </p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <ImageEditor
+                imageUrl={previewImage.imageUrl}
+                onSave={handleSaveEditedImage}
+                onCancel={() => setIsEditing(false)}
               />
-              <div className="bg-gray-50 p-3 rounded-lg mt-3">
-                <h4 className="font-semibold mb-1 text-sm">Mô tả:</h4>
-                <p className="text-gray-700 whitespace-pre-line text-sm">
-                  {previewImage.prompt}
-                </p>
-                <p className="text-xs text-gray-500 mt-2">
-                  Tạo lúc:{" "}
-                  {new Date(
-                    previewImage.updatedAt || previewImage.createdAt
-                  ).toLocaleString("vi-VN")}
-                </p>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}

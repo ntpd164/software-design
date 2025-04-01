@@ -1,4 +1,5 @@
 const axios = require("axios");
+const sharp = require("sharp");
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
@@ -433,6 +434,93 @@ exports.uploadReplaceImage = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: error.message || 'Failed to process upload'
+    });
+  }
+};
+
+
+// Thêm cập nhật cho hàm editImage
+
+exports.editImage = async (req, res) => {
+  try {
+    const { imageUrl, crop, filters, originalDimensions } = req.body;
+    
+    // Tải ảnh từ URL
+    const response = await axios({
+      url: imageUrl,
+      responseType: 'arraybuffer'
+    });
+    
+    const imageBuffer = Buffer.from(response.data);
+    
+    // Xử lý ảnh với Sharp
+    let processedImage = sharp(imageBuffer);
+    
+    // Lấy metadata của ảnh để xác minh kích thước
+    const metadata = await processedImage.metadata();
+    
+    // Cắt ảnh nếu cần
+    if (crop) {
+      // Đảm bảo các giá trị trong phạm vi hợp lệ
+      const left = Math.max(0, Math.min(crop.x, metadata.width - 1));
+      const top = Math.max(0, Math.min(crop.y, metadata.height - 1));
+      const width = Math.max(1, Math.min(crop.width, metadata.width - left));
+      const height = Math.max(1, Math.min(crop.height, metadata.height - top));
+      
+      processedImage = processedImage.extract({
+        left,
+        top,
+        width,
+        height
+      });
+    }
+    
+    // Áp dụng các bộ lọc
+    if (filters) {
+      const { brightness, contrast, saturation } = filters;
+      
+      // Tính toán giá trị cho sharp dựa trên giá trị phần trăm từ frontend
+      const sharpModulateOptions = {};
+      
+      if (brightness !== undefined) {
+        // Sharp cần giá trị trong khoảng 0-n, với 1 là giá trị mặc định (100%)
+        sharpModulateOptions.brightness = brightness / 100;
+      }
+      
+      if (saturation !== undefined) {
+        // Sharp cần giá trị trong khoảng 0-n, với 1 là giá trị mặc định (100%)
+        sharpModulateOptions.saturation = saturation / 100;
+      }
+      
+      // Áp dụng modulate cho độ sáng và độ bão hòa
+      if (Object.keys(sharpModulateOptions).length > 0) {
+        processedImage = processedImage.modulate(sharpModulateOptions);
+      }
+      
+      // Xử lý độ tương phản riêng (vì một số phiên bản Sharp không hỗ trợ contrast trong modulate)
+      if (contrast !== undefined) {
+        // Sharp cần giá trị tương phản từ -1 đến +1, với 0 là giá trị mặc định (100%)
+        // Chuyển đổi từ thang 0-200% sang -1 đến +1
+        const sharpContrast = (contrast - 100) / 100;
+        processedImage = processedImage.linear(
+          1 + sharpContrast * 0.5, // Điều chỉnh slope để phù hợp với mức độ thay đổi
+          0 // Offset
+        );
+      }
+    }
+    
+    // Chuyển đổi ảnh sang PNG
+    const outputBuffer = await processedImage.toFormat('png').toBuffer();
+    
+    // Trả lại ảnh đã chỉnh sửa
+    res.set('Content-Type', 'image/png');
+    res.send(outputBuffer);
+    
+  } catch (error) {
+    console.error('Error editing image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Không thể xử lý ảnh. Vui lòng thử lại.'
     });
   }
 };
