@@ -4,21 +4,31 @@ export interface Style {
 }
 
 export interface Work {
+  _id?: string;
   title: string;
   author?: string;
-  fromWikipedia?: boolean;
-  fromDatabase?: boolean;
   inDatabase?: boolean;
-  pageid?: number;
-  snippet?: string;
   introduction?: string;
-  _id?: string;
 }
 
 export interface PreviewResult {
   success: boolean;
-  topic: string;
-  style: string;
   preview: string;
   workIds: string[];
+}
+
+export interface ContentParams {
+  length: string;
+  tone: string;
+  complexity: string;
+  focusOn: string[];
+}
+
+export interface Image{
+  _id: string;
+  imageUrl: string;
+  prompt: string;
+  createdAt: string;
+  updatedAt: string;
+  scriptId: string;
 }
