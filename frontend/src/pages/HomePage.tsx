@@ -224,10 +224,14 @@ const HomePage: React.FC = () => {
     setStep(7); // Go to completion step
   };
 
-  const createVideoWithAudio = () => {
+  const createImage = () => {
     // This would be implemented in the next phase
     setStep(8);
   };
+
+  const createVideo = () => {
+    setStep(9);
+  }
 
   const startNewProcess = () => {
     setTopic("");
@@ -414,7 +418,7 @@ const HomePage: React.FC = () => {
 
             {scriptStatus === "approved" ? (
               <button
-                onClick={createVideoWithAudio}
+                onClick={createImage}
                 className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded font-medium cursor-pointer"
               >
                 Tiếp tục tạo video
@@ -441,11 +445,7 @@ const HomePage: React.FC = () => {
         <ImageCreation
           scriptId={savedScriptId}
           onBack={() => setStep(7)}
-          onContinue={() =>
-            alert(
-              "Chức năng tạo video sẽ được triển khai trong phiên bản tiếp theo"
-            )
-          }
+          onContinue={() => createVideo()}
           imageStyles={imageStyles}
           selectedImageStyle={selectedImageStyle}
           setSelectedImageStyle={setSelectedImageStyle}

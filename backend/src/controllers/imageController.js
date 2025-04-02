@@ -438,8 +438,11 @@ exports.uploadReplaceImage = async (req, res) => {
   }
 };
 
-
-// Thêm cập nhật cho hàm editImage
+/**
+ * Edit an image using Sharp
+ * @param {Object} req - Request object with image URL and edit parameters
+ * @param {Object} res - Response object
+ */
 
 exports.editImage = async (req, res) => {
   try {
