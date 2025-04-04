@@ -186,13 +186,10 @@ exports.generateImageFromScript = async (req, res) => {
       });
     }
 
-    // Extract image descriptions from the script
-    const scriptContent = await getImageScript(scriptId);
+    // Extract image descriptions and dialogue content from the script
+    const imageDialoguePairs = await getImageScript(scriptId);
     
-    // Parse the returned text to extract individual image descriptions
-    const imageDescriptions = parseImageDescriptions(scriptContent);
-    
-    if (!imageDescriptions || imageDescriptions.length === 0) {
+    if (!imageDialoguePairs || imageDialoguePairs.length === 0) {
       return res.status(400).json({
         success: false,
         message: "No image descriptions found in the script",
@@ -205,9 +202,9 @@ exports.generateImageFromScript = async (req, res) => {
     let failCount = 0;
     
     // Generate images sequentially and wait for completion
-    for (let i = 0; i < imageDescriptions.length; i++) {
-      const prompt = imageDescriptions[i];
-      console.log(`Generating image ${i+1}/${imageDescriptions.length}: "${prompt.substring(0, 50)}..."`);
+    for (let i = 0; i < imageDialoguePairs.length; i++) {
+      const { image: prompt, dialogue } = imageDialoguePairs[i];
+      console.log(`Generating image ${i+1}/${imageDialoguePairs.length}: "${prompt.substring(0, 50)}..."`);
       
       try {
         // Generate the image using the service directly
@@ -217,12 +214,13 @@ exports.generateImageFromScript = async (req, res) => {
         const newImage = new Image({
           scriptId,
           prompt,
+          dialogue,
           imageUrl: result.relativeImagePath,
           metadata: {
             model: "@cf/stabilityai/stable-diffusion-xl-base-1.0",
             num_inference_steps: 20,
             index: i,
-            total: imageDescriptions.length
+            total: imageDialoguePairs.length
           },
         });
         
@@ -239,6 +237,7 @@ exports.generateImageFromScript = async (req, res) => {
               images: {
                 imageUrl: result.relativeImagePath,
                 prompt: prompt,
+                dialogue: dialogue,
                 createdAt: new Date(),
                 _id: newImage._id,
               },
@@ -253,23 +252,25 @@ exports.generateImageFromScript = async (req, res) => {
           success: true,
           imageUrl: result.relativeImagePath,
           _id: newImage._id,
-          prompt: prompt.substring(0, 100) + (prompt.length > 100 ? "..." : "")
+          prompt: prompt.substring(0, 100) + (prompt.length > 100 ? "..." : ""),
+          dialogue: dialogue ? dialogue.substring(0, 100) + (dialogue.length > 100 ? "..." : "") : ""
         });
         
-        console.log(`✓ Successfully generated image ${i+1}/${imageDescriptions.length}\n`);
+        console.log(`✓ Successfully generated image ${i+1}/${imageDialoguePairs.length}\n`);
       } catch (error) {
         failCount++;
-        console.error(`× Failed to generate image ${i+1}/${imageDescriptions.length}:`, error);
+        console.error(`× Failed to generate image ${i+1}/${imageDialoguePairs.length}:`, error);
         
         results.push({
           success: false,
           error: error.message,
-          prompt: prompt.substring(0, 100) + (prompt.length > 100 ? "..." : "")
+          prompt: prompt.substring(0, 100) + (prompt.length > 100 ? "..." : ""),
+          dialogue: dialogue ? dialogue.substring(0, 100) + (dialogue.length > 100 ? "..." : "") : ""
         });
       }
       
       // Wait 1 second between requests to avoid rate limiting
-      if (i < imageDescriptions.length - 1) {
+      if (i < imageDialoguePairs.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
@@ -280,7 +281,7 @@ exports.generateImageFromScript = async (req, res) => {
       message: `Generated ${successCount} images from script (${failCount} failed)`,
       data: {
         scriptId,
-        totalProcessed: imageDescriptions.length,
+        totalProcessed: imageDialoguePairs.length,
         successCount,
         failCount,
         results
