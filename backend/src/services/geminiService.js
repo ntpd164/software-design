@@ -206,7 +206,8 @@ Hãy tìm kiếm và trích xuất các phần theo định dạng sau:
   + Dòng thứ hai bắt đầu bằng "dialogue:" chứa nội dung thoại tương ứng
 - Loại bỏ các ký hiệu đánh dấu như *, **, (), [], V.O. khỏi nội dung
 - Chỉ giữ lại phần mô tả hình ảnh và nội dung thoại, bỏ qua các chỉ dẫn về âm thanh, nhạc nền
-- Giữ các chi tiết quan trọng về bối cảnh, nhân vật và cảm xúc
+- Giữ các chi tiết quan trọng về bối cảnh, nhân vật và cảm xúc.
+- Dòng "image": không được để trống, nếu không có mô tả hình ảnh tương ứng thì để lại dòng "image:" trống
 - Nếu không tìm thấy nội dung thoại tương ứng, để trống dòng "dialogue:"
 
 Kịch bản:

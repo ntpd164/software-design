@@ -23,6 +23,7 @@ router.get("/topics/scripts", topicController.getUserScripts);
 
 // Voice generation endpoints
 router.post("/voice/generate", voiceController.generateVoice);
+router.post("/voice/generate-segments", voiceController.generateVoiceSegments);
 router.get("/voice/settings", voiceController.getVoiceSettings);
 router.post("/voice/customize", voiceController.customizeVoice);
 

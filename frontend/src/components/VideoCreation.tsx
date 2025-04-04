@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect, useRef } from "react";
+import axios from "axios";
 
 interface VideoCreationProps {
   scriptId: string;
@@ -7,36 +7,93 @@ interface VideoCreationProps {
   onComplete: () => void;
 }
 
-const VideoCreation: React.FC<VideoCreationProps> = ({ scriptId, onBack, onComplete }) => {
+const VideoCreation: React.FC<VideoCreationProps> = ({
+  scriptId,
+  onBack,
+  onComplete,
+}) => {
   const [isCreating, setIsCreating] = useState(false);
-  const [error, setError] = useState('');
-  const [videoUrl, setVideoUrl] = useState('');
+  const [error, setError] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
   const [isVideoLoading, setIsVideoLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [voiceStatus, setVoiceStatus] = useState<
+    "idle" | "generating" | "completed" | "failed"
+  >("idle");
+  const [voiceProgress, setVoiceProgress] = useState(0);
+  const generateVoicesCalled = useRef(false);
 
   const getVideoUrl = (relativePath: string) => {
-    // If URL starts with http:// or https://, it's already a full URL
     if (
       relativePath.startsWith("http://") ||
       relativePath.startsWith("https://")
     ) {
       return relativePath;
     }
-
-    // Point to your actual backend port (3000)
     return `http://localhost:3000${relativePath}`;
   };
 
-  const createVideo = async () => {
+  // Step 1: Generate voice for all dialog segments
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const generateVoicesForDialogs = async () => {
+    try {
+      setVoiceStatus("generating");
+      setVoiceProgress(10);
+      setError("");
+
+      // Get voice settings from script
+      const settingsResponse = await axios.get(
+        `/api/topics/scripts/${scriptId}`
+      );
+      if (!settingsResponse.data.success) {
+        throw new Error("Failed to get script data");
+      }
+
+      const voiceSettings = settingsResponse.data.script.voiceSettings || {
+        style: "formal",
+        language: "vi",
+        pitch: 0,
+        speakingRate: 1.0,
+        volumeGain: 0,
+        voiceId: null,
+      };
+
+      // Call the API to generate voice segments
+      const response = await axios.post("/api/voice/generate-segments", {
+        scriptId,
+        style: voiceSettings.style,
+        language: voiceSettings.language,
+        voiceId: voiceSettings.voiceId,
+        pitch: voiceSettings.pitch,
+        speakingRate: voiceSettings.speakingRate,
+        volumeGain: voiceSettings.volumeGain,
+      });
+
+      if (!response.data.success) {
+        throw new Error("Failed to generate voice segments");
+      }
+
+      setVoiceStatus("completed");
+      setVoiceProgress(100);
+
+      // Proceed to create the video
+      await createVideoWithAudio();
+    } catch (err) {
+      console.error("Error generating voice segments:", err);
+      setError("Đã xảy ra lỗi khi tạo giọng nói cho các đoạn hội thoại");
+      setVoiceStatus("failed");
+    }
+  };
+
+  // Step 2: Create video with the generated audio
+  const createVideoWithAudio = async () => {
     try {
       setIsCreating(true);
-      setError('');
-      setIsVideoLoading(false);
       setProgress(0);
-      
+
       // Simulate progress
       const progressInterval = setInterval(() => {
-        setProgress(prev => {
+        setProgress((prev) => {
           if (prev >= 90) {
             clearInterval(progressInterval);
             return 90;
@@ -45,8 +102,9 @@ const VideoCreation: React.FC<VideoCreationProps> = ({ scriptId, onBack, onCompl
         });
       }, 1000);
 
-      const response = await axios.post('/api/video/create-video', {
-        scriptId
+      const response = await axios.post("/api/video/create-video", {
+        scriptId,
+        withAudio: true,
       });
 
       clearInterval(progressInterval);
@@ -54,32 +112,56 @@ const VideoCreation: React.FC<VideoCreationProps> = ({ scriptId, onBack, onCompl
 
       if (response.data.success) {
         setVideoUrl(getVideoUrl(response.data.video.url));
-        setIsVideoLoading(true);
+        // Start with isVideoLoading = true so the loading indicator shows
+        setIsVideoLoading(false); // This is correct - we show loading indicator first
       } else {
-        setError('Không thể tạo video. Vui lòng thử lại.');
+        setError("Không thể tạo video. Vui lòng thử lại.");
       }
     } catch (err) {
-      console.error('Error creating video:', err);
-      setError('Đã xảy ra lỗi khi tạo video');
+      console.error("Error creating video:", err);
+      setError("Đã xảy ra lỗi khi tạo video");
     } finally {
       setIsCreating(false);
     }
   };
 
+  // Start the process automatically when component mounts
   useEffect(() => {
-    createVideo();
-  }, []);
-
-  const handleDownload = () => {
-    if (videoUrl) {
-      // Extract filename from videoUrl
-      const filename = videoUrl.split('/').pop();
-      if (filename) {
-        // Use the download API endpoint
-        window.location.href = `http://localhost:3000/api/video/download/${filename}`;
-      }
+    // Check if generateVoicesForDialogs has already been called
+    if (!generateVoicesCalled.current) {
+      generateVoicesCalled.current = true;
+      generateVoicesForDialogs();
     }
-  };
+
+    return () => {
+      // Cleanup function
+    };
+  }, [generateVoicesForDialogs, scriptId, voiceStatus]);
+
+  useEffect(() => {
+    if (videoUrl) {
+      // Log the video URL for debugging
+      console.log("Loading video from URL:", videoUrl);
+
+      // Check if the video URL is accessible
+      fetch(videoUrl, { method: "HEAD" })
+        .then((response) => {
+          if (response.ok) {
+            console.log("Video URL is accessible:", response.status);
+            console.log("Content-Type:", response.headers.get("content-type"));
+            console.log(
+              "Content-Length:",
+              response.headers.get("content-length")
+            );
+          } else {
+            console.error("Video URL is not accessible:", response.status);
+          }
+        })
+        .catch((err) => {
+          console.error("Error checking video URL:", err);
+        });
+    }
+  }, [videoUrl]);
 
   return (
     <div className="bg-white rounded-lg shadow-md border-2 border-gray-200 p-6">
@@ -93,21 +175,39 @@ const VideoCreation: React.FC<VideoCreationProps> = ({ scriptId, onBack, onCompl
 
       <div className="mb-6">
         <p className="text-gray-600 mb-4">
-          Hệ thống sẽ ghép các hình ảnh đã tạo thành một video theo thứ tự. Quá
-          trình này có thể mất vài phút.
+          Hệ thống sẽ tạo giọng nói cho từng đoạn hội thoại và ghép với hình ảnh
+          tương ứng, sau đó kết hợp thành một video hoàn chỉnh.
         </p>
       </div>
 
+      {/* Voice generation progress */}
+      {voiceStatus === "generating" && (
+        <div className="mb-6">
+          <h3 className="text-lg font-medium mb-2">Bước 1: Tạo giọng nói</h3>
+          <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+            <div
+              className="bg-purple-600 h-2.5 rounded-full transition-all duration-500"
+              style={{ width: `${voiceProgress}%` }}
+            ></div>
+          </div>
+          <p className="text-center text-gray-600">
+            Đang tạo giọng nói cho các đoạn hội thoại... {voiceProgress}%
+          </p>
+        </div>
+      )}
+
+      {/* Video creation progress */}
       {isCreating && (
         <div className="mb-6">
+          <h3 className="text-lg font-medium mb-2">Bước 2: Tạo video</h3>
           <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
-            <div 
+            <div
               className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
               style={{ width: `${progress}%` }}
             ></div>
           </div>
           <p className="text-center text-gray-600">
-            Đang tạo video... {progress}%
+            Đang ghép video với giọng nói... {progress}%
           </p>
         </div>
       )}
@@ -116,52 +216,53 @@ const VideoCreation: React.FC<VideoCreationProps> = ({ scriptId, onBack, onCompl
         <div className="mb-6">
           <h3 className="text-lg font-medium mb-2">Video đã tạo:</h3>
           <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
-            {isVideoLoading ? (
-              <div className="absolute top-0 left-0 w-full h-full">
-                <video
-                  controls
-                  className="w-full h-full rounded-lg"
-                  onError={(e) => {
-                    console.error("Video loading error:", e);
-                    setError("Không thể tải video. Vui lòng thử lại.");
-                  }}
-                >
-                  <source src={videoUrl} type="video/mp4" />
-                  Trình duyệt của bạn không hỗ trợ video.
-                </video>
-              </div>
-            ) : (
-              <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-gray-100 rounded-lg">
-                <div className="text-gray-500">Đang tải video...</div>
-              </div>
-            )}
+            <div className="absolute top-0 left-0 w-full h-full">
+              {/* Always render the video element but conditionally show loading overlay */}
+              <video
+                controls
+                className="w-full h-full rounded-lg"
+                onLoadedData={() => {
+                  console.log("Video loaded successfully");
+                  setIsVideoLoading(true);
+                }}
+                onError={(e) => {
+                  console.error("Video loading error:", e);
+                  setError("Không thể tải video. Vui lòng thử lại.");
+                }}
+              >
+                <source src={videoUrl} type="video/mp4" />
+                Trình duyệt của bạn không hỗ trợ video.
+              </video>
+
+              {/* Overlay loading indicator */}
+              {!isVideoLoading && (
+                <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-gray-100 bg-opacity-70 rounded-lg">
+                  <div className="text-gray-800 font-medium">
+                    Đang tải video...
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      <div className="flex justify-between">
+      <div className="flex justify-between mt-4">
         <button
           onClick={onBack}
           className="bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded font-medium"
+          disabled={voiceStatus === "generating" || isCreating}
         >
           Quay lại
         </button>
 
-        {!isCreating && videoUrl && (
-          <div className="space-x-4">
-            <button
-              onClick={handleDownload}
-              className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded font-medium"
-            >
-              Tải video
-            </button>
-            <button
-              onClick={onComplete}
-              className="bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded font-medium"
-            >
-              Tiếp tục tạo video
-            </button>
-          </div>
+        {videoUrl && !isCreating && (
+          <button
+            onClick={onComplete}
+            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded font-medium"
+          >
+            Hoàn thành
+          </button>
         )}
       </div>
     </div>

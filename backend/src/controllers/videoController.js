@@ -9,7 +9,7 @@ const fs = require("fs");
  */
 exports.createVideo = async (req, res) => {
   try {
-    const { scriptId } = req.body;
+    const { scriptId, withAudio = true } = req.body;
 
     if (!scriptId) {
       return res.status(400).json({
@@ -17,6 +17,8 @@ exports.createVideo = async (req, res) => {
         message: "Script ID is required",
       });
     }
+
+    console.log(`Creating video for script ${scriptId} ${withAudio ? 'with' : 'without'} audio`);
 
     const result = await videoService.createVideo(scriptId);
 
