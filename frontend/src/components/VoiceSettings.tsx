@@ -79,7 +79,7 @@ const VoiceSettings: React.FC<VoiceSettingsProps> = ({
     setError("");
 
     // Get a short sample from the script (first 100 characters)
-    const previewText = scriptContent.slice(0, 100) + "...";
+    const previewText = scriptContent.slice(0, 200) + "...";
 
     try {
       const response = await axios.post("/api/voice/generate", {

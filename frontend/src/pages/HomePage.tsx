@@ -6,6 +6,7 @@ import StyleSelection, { ContentParams } from "../components/StyleSelection";
 import ScriptPreview from "../components/ScriptPreview";
 import VoiceSettings from "../components/VoiceSettings";
 import ImageCreation from "../components/ImageCreation";
+import VideoCreation from "../components/VideoCreation";
 import { Style, Work, PreviewResult, Image } from "../types";
 
 const HomePage: React.FC = () => {
@@ -231,7 +232,7 @@ const HomePage: React.FC = () => {
 
   const createVideo = () => {
     setStep(9);
-  }
+  };
 
   const startNewProcess = () => {
     setTopic("");
@@ -455,6 +456,14 @@ const HomePage: React.FC = () => {
           setGeneratedImages={setGeneratedImages}
           imageError={imageError}
           setImageError={setImageError}
+        />
+      )}
+
+      {step === 9 && (
+        <VideoCreation
+          scriptId={savedScriptId}
+          onBack={() => setStep(8)}
+          onComplete={() => setStep(1)}
         />
       )}
     </div>

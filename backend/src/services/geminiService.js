@@ -179,34 +179,88 @@ exports.getImageScript = async (scriptId) => {
 
     const content = script.content;
 
-    // Enhanced prompt to extract image descriptions from various formats
-    const prompt = `Nhiệm vụ: Trích xuất TẤT CẢ những mô tả về hình ảnh từ kịch bản phim dưới đây.
+    // Enhanced prompt to extract image descriptions and corresponding narrator content
+    const prompt = `Nhiệm vụ: Trích xuất TẤT CẢ những mô tả về hình ảnh và nội dung thoại tương ứng từ kịch bản phim dưới đây.
 
-Hãy tìm kiếm và trích xuất các phần mô tả hình ảnh theo các định dạng sau:
-1. Các dòng có cú pháp "**(Hình ảnh:** <mô tả>)"
-2. Các dòng bắt đầu với "**Hình ảnh:**" hoặc "Hình ảnh:"
-3. Các mục có dấu bullet (*) và chứa mô tả hình ảnh
-4. Phần "Hình ảnh:" trong phần giới thiệu hoặc mô tả chung
-5. Bất kỳ đoạn văn nào mô tả các cảnh quay, bối cảnh trực quan, cảnh trí
+Hãy tìm kiếm và trích xuất các phần theo định dạng sau:
+1. Với mỗi hình ảnh, trích xuất:
+   - Mô tả hình ảnh (tìm theo các cú pháp sau):
+     + "**(Hình ảnh):** <mô tả>"
+     + "**Hình ảnh:** <mô tả>"
+     + "Hình ảnh: <mô tả>"
+     + Các mô tả trong phần "Bối cảnh:" hoặc "Nhân vật:"
+     + Các mô tả trong dấu ngoặc đơn như "(Bước vào bếp, nhìn ông Kazuo đang chuẩn bị nguyên liệu)"
+     + Các mô tả trong dấu ngoặc vuông như "[Mở đầu – Cảnh 1: Căn bếp ấm áp]"
+   - Nội dung thoại tương ứng (tìm theo các cú pháp sau):
+     + Các đoạn thoại có nhãn nhân vật như "**Nhân vật:** <nội dung>"
+     + Các đoạn thoại trong dấu ngoặc đơn như "(Nhìn vào máy quay) Kính chào quý vị"
+     + Các đoạn thoại trong dấu ngoặc vuông như "[V.O.]"
+     + Các đoạn văn không có nhãn người nói
+     + Các đoạn hội thoại liên quan đến hình ảnh
 
 Định dạng kết quả:
-- Liệt kê từng mô tả hình ảnh trên một dòng mới
-- Mỗi mô tả bắt đầu bằng dấu "-"
-- Loại bỏ các ký hiệu đánh dấu như *, ** hoặc (Hình ảnh:) khỏi nội dung
-- Chỉ giữ lại phần mô tả hình ảnh, bỏ qua các chỉ dẫn về âm thanh, giọng đọc, hoặc ghi chú kỹ thuật
-- Giữ các chi tiết quan trọng về bối cảnh, nhân vật và cảm xúc trong hình ảnh
+- Mỗi cặp hình ảnh và nội dung thoại được đặt trong một khối
+- Mỗi khối bắt đầu bằng "---"
+- Trong mỗi khối:
+  + Dòng đầu tiên bắt đầu bằng "image:" chứa mô tả hình ảnh
+  + Dòng thứ hai bắt đầu bằng "dialogue:" chứa nội dung thoại tương ứng
+- Loại bỏ các ký hiệu đánh dấu như *, **, (), [], V.O. khỏi nội dung
+- Chỉ giữ lại phần mô tả hình ảnh và nội dung thoại, bỏ qua các chỉ dẫn về âm thanh, nhạc nền
+- Giữ các chi tiết quan trọng về bối cảnh, nhân vật và cảm xúc.
+- Dòng "image": không được để trống, nếu không có mô tả hình ảnh tương ứng thì để lại dòng "image:" trống
+- Nếu không tìm thấy nội dung thoại tương ứng, để trống dòng "dialogue:"
 
 Kịch bản:
 ${content}`;
 
-    // Call Gemini API to extract image descriptions
-    const imageContent = await this.generateScript(prompt);
+    // Call Gemini API to extract image descriptions and dialogue content
+    const result = await this.generateScript(prompt);
 
-    return imageContent;
+    // Parse the result into an array of objects
+    const blocks = result.split('---').filter(block => block.trim());
+    const imageDialoguePairs = blocks.map(block => {
+      const lines = block.split('\n').filter(line => line.trim());
+      const imageLine = lines.find(line => line.startsWith('image:'));
+      const dialogueLine = lines.find(line => line.startsWith('dialogue:'));
+      
+      return {
+        image: imageLine ? imageLine.replace('image:', '').trim() : '',
+        dialogue: dialogueLine ? dialogueLine.replace('dialogue:', '').trim() : ''
+      };
+    });
+
+    console.log("Extracted image-dialogue pairs:", imageDialoguePairs);
+    return imageDialoguePairs;
   } catch (error) {
     console.error("Error in getImageScript:", error);
     throw error;
   } finally {
     await client.close();
+  }
+};
+
+exports.extractNarratorContent = async (scriptContent) => {
+  try {
+    const prompt = `Nhiệm vụ: Trích xuất TẤT CẢ nội dung của người dẫn chuyện từ kịch bản video dưới đây.
+
+Hãy tìm kiếm và trích xuất các phần có cú pháp "**Người dẫn truyện:**" hoặc "**Người dẫn truyện (giọng trang trọng, học thuật):**" và nội dung sau đó.
+
+Định dạng kết quả:
+- Mỗi đoạn nội dung người dẫn chuyện trên một dòng mới
+- Mỗi đoạn bắt đầu bằng dấu "-"
+- Loại bỏ các ký hiệu đánh dấu như ** hoặc (giọng trang trọng, học thuật)
+- Chỉ giữ lại phần nội dung người dẫn chuyện, bỏ qua các chỉ dẫn về hình ảnh, nhạc nền
+- Giữ nguyên dấu câu và ngắt dòng
+
+Kịch bản:
+${scriptContent}`;
+
+    // Call Gemini API to extract narrator content
+    const narratorContent = await this.generateScript(prompt);
+
+    return narratorContent;
+  } catch (error) {
+    console.error("Error in extractNarratorContent:", error);
+    throw error;
   }
 };
