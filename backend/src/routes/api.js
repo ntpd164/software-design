@@ -38,5 +38,6 @@ router.post("/images/edit", imageController.editImage);
 // Video creation endpoint
 router.post("/video/create-video", videoController.createVideo);
 router.get("/video/download/:filename", videoController.downloadVideo);
+router.get("/videos", videoController.getAllVideos);
 
 module.exports = router;

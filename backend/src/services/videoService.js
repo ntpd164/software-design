@@ -4,6 +4,7 @@ const ffmpeg = require("fluent-ffmpeg");
 const path = require("path");
 const fs = require("fs");
 const Video = require("../models/videoModel");
+const geminiService = require("./geminiService");
 const { v4: uuidv4 } = require("uuid");
 
 const uri =
@@ -305,12 +306,13 @@ const createVideo = async (scriptId, withAudio = true) => {
       duration: Math.round(totalDuration),
       createdAt: new Date(),
     };
+    const title = geminiService.extractScriptTitle(script.content);
 
-    // Save to videos collection
     try {
       const video = new Video({
         scriptId: scriptId,
         videoUrl: videoUrl,
+        title: title || "Untitled Video",
         duration: Math.round(totalDuration),
         createdAt: new Date(),
       });
@@ -355,6 +357,43 @@ const createVideo = async (scriptId, withAudio = true) => {
   }
 };
 
+/**
+ * Get all videos with pagination
+ * @param {Object} options - Pagination options
+ * @param {number} options.limit - Number of records to fetch
+ * @param {number} options.skip - Number of records to skip
+ * @returns {Promise<Object>} - Object containing videos and pagination info
+ */
+const getAllVideos = async (options = {}) => {
+  const { limit = 20, skip = 0 } = options;
+  
+  try {
+    const videos = await Video.find()
+      .sort({ createdAt: -1 })
+      .skip(Number(skip))
+      .limit(Number(limit))
+      .populate('scriptId', 'topic')
+      .lean();
+      
+    const totalCount = await Video.countDocuments();
+    
+    return {
+      success: true,
+      videos,
+      pagination: {
+        total: totalCount,
+        limit: Number(limit),
+        skip: Number(skip)
+      }
+    };
+  } catch (error) {
+    console.error("Error fetching videos:", error);
+    throw error;
+  }
+};
+
 module.exports = {
   createVideo,
+  getAllVideos,
 };
+
