@@ -306,7 +306,7 @@ const createVideo = async (scriptId, withAudio = true) => {
       duration: Math.round(totalDuration),
       createdAt: new Date(),
     };
-    const title = geminiService.extractScriptTitle(script.content);
+    const title = await geminiService.extractScriptTitle(script.content);
 
     try {
       const video = new Video({
