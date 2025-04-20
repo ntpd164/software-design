@@ -15,7 +15,7 @@ const videoSchema = new mongoose.Schema({
     default: "Untitled Video",
   },
   duration: {
-    type: Number,
+    type: String,
     required: true,
   },
   createdAt: {
