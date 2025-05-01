@@ -4,6 +4,7 @@ const topicController = require("../controllers/topicController");
 const voiceController = require("../controllers/voiceController");
 const imageController = require("../controllers/imageController");
 const videoController = require("../controllers/videoController");
+const youtubeController = require('../controllers/youtubeController');
 
 // Endpoints cho trình tạo video văn học với quy trình mới
 router.get("/topics/suggestions", topicController.getSuggestions);
@@ -39,5 +40,14 @@ router.post("/images/edit", imageController.editImage);
 router.post("/video/create-video", videoController.createVideo);
 router.get("/video/download/:filename", videoController.downloadVideo);
 router.get("/videos", videoController.getAllVideos);
+
+// Get YouTube authorization URL
+router.get('/youtube/auth-url', youtubeController.getAuthUrl);
+
+// Handle authorization code
+router.post('/youtube/auth-code', youtubeController.handleAuthCode);
+
+// Upload video to YouTube
+router.post('/youtube/upload', youtubeController.uploadVideo);
 
 module.exports = router;

@@ -7,6 +7,12 @@ const Video = require("../models/videoModel");
 const geminiService = require("./geminiService");
 const { v4: uuidv4 } = require("uuid");
 
+const ffmpegPath = '/opt/homebrew/bin/ffmpeg';
+const ffprobePath = '/opt/homebrew/bin/ffprobe';
+
+ffmpeg.setFfmpegPath(ffmpegPath);
+ffmpeg.setFfprobePath(ffprobePath);
+
 const uri =
   "mongodb+srv://duongngo1616:vzYfPnMrEB3yF6Qy@literature.s3u8i.mongodb.net/literature_db?retryWrites=true&w=majority";
 const dbName = "literature_db";

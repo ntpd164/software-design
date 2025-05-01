@@ -22,6 +22,16 @@ const videoSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  // New fields for YouTube integration
+  youtubeId: {
+    type: String,
+  },
+  youtubeUrl: {
+    type: String,
+  },
+  youtubeUploadedAt: {
+    type: Date,
+  }
 });
 
 module.exports = mongoose.model("Video", videoSchema);

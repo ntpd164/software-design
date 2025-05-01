@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import axios from "axios";
+import YouTubeShare from "./YoutubeShare";
+import api from "../services/api";
+import { useRef } from "react";
 
 interface VideoCreationProps {
   scriptId: string;
@@ -22,6 +24,14 @@ const VideoCreation: React.FC<VideoCreationProps> = ({
   >("idle");
   const [voiceProgress, setVoiceProgress] = useState(0);
   const generateVoicesCalled = useRef(false);
+  const [videoId, setVideoId] = useState<string>("");
+  console.log("🚀 ~ videoId:", videoId);
+  const [videoTitle, setVideoTitle] = useState<string>("");
+  console.log("🚀 ~ videoTitle:", videoTitle);
+  const [showYoutubeShare, setShowYoutubeShare] = useState(false);
+  console.log("🚀 ~ showYoutubeShare:", showYoutubeShare);
+  const [youtubeUrl, setYoutubeUrl] = useState("");
+  console.log("🚀 ~ youtubeUrl:", youtubeUrl);
 
   const getVideoUrl = (relativePath: string) => {
     if (
@@ -42,12 +52,13 @@ const VideoCreation: React.FC<VideoCreationProps> = ({
       setError("");
 
       // Get voice settings from script
-      const settingsResponse = await axios.get(
-        `/api/topics/scripts/${scriptId}`
-      );
+      const settingsResponse = await api.get(`/api/topics/scripts/${scriptId}`);
       if (!settingsResponse.data.success) {
         throw new Error("Failed to get script data");
       }
+
+      // Store video title from script
+      setVideoTitle(settingsResponse.data.script.title || "AI Generated Video");
 
       const voiceSettings = settingsResponse.data.script.voiceSettings || {
         style: "formal",
@@ -59,7 +70,7 @@ const VideoCreation: React.FC<VideoCreationProps> = ({
       };
 
       // Call the API to generate voice segments
-      const response = await axios.post("/api/voice/generate-segments", {
+      const response = await api.post("/api/voice/generate-segments", {
         scriptId,
         style: voiceSettings.style,
         language: voiceSettings.language,
@@ -102,7 +113,7 @@ const VideoCreation: React.FC<VideoCreationProps> = ({
         });
       }, 1000);
 
-      const response = await axios.post("/api/video/create-video", {
+      const response = await api.post("/api/video/create-video", {
         scriptId,
         withAudio: true,
       });
@@ -110,10 +121,43 @@ const VideoCreation: React.FC<VideoCreationProps> = ({
       clearInterval(progressInterval);
       setProgress(100);
 
+      // Add this debugging line to see the actual response
+      console.log("Video creation response:", response.data);
+
+      // Update the video ID extraction logic in createVideoWithAudio function
+
       if (response.data.success) {
         setVideoUrl(getVideoUrl(response.data.video.url));
-        // Start with isVideoLoading = true so the loading indicator shows
-        setIsVideoLoading(false); // This is correct - we show loading indicator first
+
+        // Update this section to extract ID from URL if not provided directly
+        if (response.data.video._id) {
+          console.log("Setting video ID from _id:", response.data.video._id);
+          setVideoId(response.data.video._id);
+        } else if (response.data.video.id) {
+          console.log("Setting video ID from id:", response.data.video.id);
+          setVideoId(response.data.video.id);
+        } else {
+          // Extract ID from the filename if possible
+          const urlParts = response.data.video.url.split("/");
+          const filename = urlParts[urlParts.length - 1];
+          const filenameParts = filename.split("-");
+
+          if (filenameParts.length > 1) {
+            // Extract the ID part (before .mp4)
+            const idWithExtension = filenameParts[filenameParts.length - 1];
+            const id = idWithExtension.replace(".mp4", "");
+            console.log("Extracted video ID from filename:", id);
+            setVideoId(id);
+          } else {
+            // If we can't extract from filename, create a temporary ID
+            const tempId = "temp-" + Date.now();
+            console.log("Creating temporary video ID:", tempId);
+            setVideoId(tempId);
+          }
+        }
+
+        // For video loading
+        setIsVideoLoading(false);
       } else {
         setError("Không thể tạo video. Vui lòng thử lại.");
       }
@@ -123,6 +167,22 @@ const VideoCreation: React.FC<VideoCreationProps> = ({
     } finally {
       setIsCreating(false);
     }
+  };
+
+  // Handle YouTube share button click
+  const handleShareToYoutube = () => {
+    setShowYoutubeShare(true);
+  };
+
+  // Handle YouTube share completion
+  const handleYoutubeShareComplete = (url: string) => {
+    setYoutubeUrl(url);
+    setShowYoutubeShare(false);
+  };
+
+  // Handle YouTube share cancellation
+  const handleYoutubeShareCancel = () => {
+    setShowYoutubeShare(false);
   };
 
   // Start the process automatically when component mounts
@@ -163,23 +223,21 @@ const VideoCreation: React.FC<VideoCreationProps> = ({
     }
   }, [videoUrl]);
 
+  console.log("🚀 ~ showYoutubeShare:", showYoutubeShare);
   return (
     <div className="bg-white rounded-lg shadow-md border-2 border-gray-200 p-6">
       <h2 className="text-2xl font-bold mb-4">Tạo video</h2>
-
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
         </div>
       )}
-
       <div className="mb-6">
         <p className="text-gray-600 mb-4">
           Hệ thống sẽ tạo giọng nói cho từng đoạn hội thoại và ghép với hình ảnh
           tương ứng, sau đó kết hợp thành một video hoàn chỉnh.
         </p>
       </div>
-
       {/* Voice generation progress */}
       {voiceStatus === "generating" && (
         <div className="mb-6">
@@ -195,7 +253,6 @@ const VideoCreation: React.FC<VideoCreationProps> = ({
           </p>
         </div>
       )}
-
       {/* Video creation progress */}
       {isCreating && (
         <div className="mb-6">
@@ -211,8 +268,7 @@ const VideoCreation: React.FC<VideoCreationProps> = ({
           </p>
         </div>
       )}
-
-      {videoUrl && (
+      {videoUrl && !showYoutubeShare && (
         <div className="mb-6">
           <h3 className="text-lg font-medium mb-2">Video đã tạo:</h3>
           <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
@@ -244,9 +300,69 @@ const VideoCreation: React.FC<VideoCreationProps> = ({
               )}
             </div>
           </div>
+
+          {/* YouTube sharing success message */}
+          {youtubeUrl && (
+            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <h4 className="font-medium text-green-800 mb-2">
+                Video đã được chia sẻ lên YouTube!
+              </h4>
+              <p className="text-sm mb-2">
+                Link YouTube của bạn:{" "}
+                <a
+                  href={youtubeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline break-all"
+                >
+                  {youtubeUrl}
+                </a>
+              </p>
+            </div>
+          )}
+
+          {/* YouTube sharing button */}
+          {videoId && isVideoLoading && !youtubeUrl && (
+            <div className="mt-4">
+              <button
+                onClick={handleShareToYoutube}
+                className="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded font-medium flex items-center mx-auto"
+              >
+                <svg
+                  className="w-5 h-5 mr-2"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"></path>
+                </svg>
+                Chia sẻ lên YouTube
+              </button>
+            </div>
+          )}
         </div>
       )}
 
+      {/* YouTube Sharing Component */}
+      {showYoutubeShare && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
+          {/* Backdrop with blur effect */}
+          <div
+            className="fixed inset-0 transition-opacity bg-black bg-opacity-50 backdrop-blur-sm"
+            onClick={handleYoutubeShareCancel}
+          ></div>
+
+          {/* Modal Content */}
+          <div className="bg-white rounded-lg shadow-lg z-10 w-full max-w-2xl relative animate-fade-in-up">
+            <YouTubeShare
+              videoId={videoId}
+              videoTitle={videoTitle}
+              onComplete={handleYoutubeShareComplete}
+              onCancel={handleYoutubeShareCancel}
+            />
+          </div>
+        </div>
+      )}
       <div className="flex justify-between mt-4">
         <button
           onClick={onBack}
@@ -256,7 +372,7 @@ const VideoCreation: React.FC<VideoCreationProps> = ({
           Quay lại
         </button>
 
-        {videoUrl && !isCreating && (
+        {videoUrl && !isCreating && !showYoutubeShare && (
           <button
             onClick={onComplete}
             className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded font-medium"
