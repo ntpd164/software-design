@@ -7,11 +7,27 @@ const Video = require("../models/videoModel");
 const geminiService = require("./geminiService");
 const { v4: uuidv4 } = require("uuid");
 
-const ffmpegPath = '/opt/homebrew/bin/ffmpeg';
-const ffprobePath = '/opt/homebrew/bin/ffprobe';
+// Detect OS and set appropriate FFmpeg paths
+const isWindows = process.platform === "win32";
+const isMac = process.platform === "darwin";
 
-ffmpeg.setFfmpegPath(ffmpegPath);
-ffmpeg.setFfprobePath(ffprobePath);
+// Only set custom paths if needed, otherwise use system-installed FFmpeg
+if (isMac) {
+  // macOS paths (Homebrew)
+  const ffmpegPath = "/opt/homebrew/bin/ffmpeg";
+  const ffprobePath = "/opt/homebrew/bin/ffprobe";
+
+  if (fs.existsSync(ffmpegPath) && fs.existsSync(ffprobePath)) {
+    ffmpeg.setFfmpegPath(ffmpegPath);
+    ffmpeg.setFfprobePath(ffprobePath);
+    console.log("Using Homebrew FFmpeg paths");
+  } else {
+    console.log("Homebrew FFmpeg not found, using system FFmpeg");
+  }
+} else if (isWindows) {
+  // On Windows, we'll rely on FFmpeg being in the PATH
+  console.log("Using system FFmpeg on Windows");
+}
 
 const uri =
   "mongodb+srv://duongngo1616:vzYfPnMrEB3yF6Qy@literature.s3u8i.mongodb.net/literature_db?retryWrites=true&w=majority";
@@ -372,25 +388,25 @@ const createVideo = async (scriptId, withAudio = true) => {
  */
 const getAllVideos = async (options = {}) => {
   const { limit = 20, skip = 0 } = options;
-  
+
   try {
     const videos = await Video.find()
       .sort({ createdAt: -1 })
       .skip(Number(skip))
       .limit(Number(limit))
-      .populate('scriptId', 'topic')
+      .populate("scriptId", "topic")
       .lean();
-      
+
     const totalCount = await Video.countDocuments();
-    
+
     return {
       success: true,
       videos,
       pagination: {
         total: totalCount,
         limit: Number(limit),
-        skip: Number(skip)
-      }
+        skip: Number(skip),
+      },
     };
   } catch (error) {
     console.error("Error fetching videos:", error);
@@ -402,4 +418,3 @@ module.exports = {
   createVideo,
   getAllVideos,
 };
-
