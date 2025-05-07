@@ -264,3 +264,30 @@ ${scriptContent}`;
     throw error;
   }
 };
+
+/**
+ * Extract an appropriate title for a script using Gemini API
+ * @param {string} scriptContent - The full script content
+ * @returns {Promise<string>} - The generated title
+ */
+exports.extractScriptTitle = async (scriptContent) => {
+  try {
+    // Create a prompt to extract a title
+    const prompt = `You are given a script for a video about Vietnamese literature and culture. 
+    Please generate a concise, engaging title for this video in Vietnamese. 
+    The title should be between 5-10 words, capture the essence of the content, and be engaging.
+    
+    Script:
+    ${scriptContent}
+    
+    Output format:
+    Just provide the title, without any additional explanation or commentary.`;
+
+    // Call Gemini API to generate a title
+    const title = await this.generateScript(prompt);
+    return title.trim();
+  } catch (error) {
+    console.error("Error in extractScriptTitle:", error);
+    throw error;
+  }
+};

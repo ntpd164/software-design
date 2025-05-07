@@ -60,3 +60,24 @@ exports.downloadVideo = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+/**
+ * Get all videos with pagination
+ * @param {Object} req - Request object with query parameters
+ * @param {Object} res - Response object
+ */
+exports.getAllVideos = async (req, res) => {
+  try {
+    const { limit, skip } = req.query;
+    
+    const result = await videoService.getAllVideos({ limit, skip });
+    
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error getting videos:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to retrieve videos"
+    });
+  }
+};
