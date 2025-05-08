@@ -10,7 +10,7 @@ module.exports = {
   elevenlabs: {
     endpoint: "https://api.elevenlabs.io/v1/text-to-speech",
     // apiKey: "sk_34c05075798f0d2cc85faab0d78f2067afe556e5f9a02701", // Khóa miễn phí
-    apiKey : "sk_0a60cfbd5d4138057b2b96d1a8dc4614eac614fb5a0a7287",
+    apiKey : "sk_333c1adb1ba9f26c24cbed9868ac3f0f38dd8ba95a33ac50",
     voicesUrl: "https://api.elevenlabs.io/v1/voices",
     defaultVoice: {
       en: "21m00Tcm4TlvDq8ikWAM", // Giọng Rachel cho tiếng Anh
