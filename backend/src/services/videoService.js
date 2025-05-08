@@ -10,6 +10,7 @@ const { v4: uuidv4 } = require("uuid");
 // Detect OS and set appropriate FFmpeg paths
 const isWindows = process.platform === "win32";
 const isMac = process.platform === "darwin";
+const isLinux = process.platform === "linux";
 
 // Only set custom paths if needed, otherwise use system-installed FFmpeg
 if (isMac) {
@@ -23,6 +24,25 @@ if (isMac) {
     console.log("Using Homebrew FFmpeg paths");
   } else {
     console.log("Homebrew FFmpeg not found, using system FFmpeg");
+  }
+} else if (isLinux) {
+  // Linux paths (common locations)
+  const commonPaths = [
+    "/usr/bin/ffmpeg",
+    "/usr/local/bin/ffmpeg",
+    "/usr/bin/ffprobe",
+    "/usr/local/bin/ffprobe",
+  ];
+
+  const ffmpegPath = "/usr/bin/ffmpeg";
+  const ffprobePath = "/usr/bin/ffprobe";
+
+  if (fs.existsSync(ffmpegPath) && fs.existsSync(ffprobePath)) {
+    ffmpeg.setFfmpegPath(ffmpegPath);
+    ffmpeg.setFfprobePath(ffprobePath);
+    console.log("Using Linux FFmpeg paths");
+  } else {
+    console.log("Linux FFmpeg not found at common paths, using system FFmpeg");
   }
 } else if (isWindows) {
   // On Windows, we'll rely on FFmpeg being in the PATH
