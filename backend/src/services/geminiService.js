@@ -142,7 +142,7 @@ exports.autoAdjustScript = async (scriptId, adjustment) => {
 
     // Tạo prompt để điều chỉnh nội dung
     const prompt = `Hãy điều chỉnh kịch bản video văn học sau theo yêu cầu: "${adjustment}".
-    
+
 Kịch bản hiện tại:
 ${script.content}
 
@@ -217,15 +217,20 @@ ${content}`;
     const result = await this.generateScript(prompt);
 
     // Parse the result into an array of objects
-    const blocks = result.split('---').filter(block => block.trim());
-    const imageDialoguePairs = blocks.map(block => {
-      const lines = block.split('\n').filter(line => line.trim());
-      const imageLine = lines.find(line => line.startsWith('image:'));
-      const dialogueLine = lines.find(line => line.startsWith('dialogue:'));
-      
+    const blocks = result.split("---").filter((block) => block.trim());
+    const imageDialoguePairs = blocks.map((block) => {
+      const lines = block.split("\n").filter((line) => line.trim());
+      const imageLine = lines.find((line) => line.startsWith("image:"));
+      const dialogueLine = lines.find((line) => line.startsWith("dialogue:"));
+
+      const imageContent = imageLine
+        ? imageLine.replace("image:", "").trim()
+        : "";
       return {
-        image: imageLine ? imageLine.replace('image:', '').trim() : '',
-        dialogue: dialogueLine ? dialogueLine.replace('dialogue:', '').trim() : ''
+        image: imageContent === "" ? "Hình ảnh trống" : imageContent,
+        dialogue: dialogueLine
+          ? dialogueLine.replace("dialogue:", "").trim()
+          : "",
       };
     });
 
@@ -273,13 +278,13 @@ ${scriptContent}`;
 exports.extractScriptTitle = async (scriptContent) => {
   try {
     // Create a prompt to extract a title
-    const prompt = `You are given a script for a video about Vietnamese literature and culture. 
-    Please generate a concise, engaging title for this video in Vietnamese. 
+    const prompt = `You are given a script for a video about Vietnamese literature and culture.
+    Please generate a concise, engaging title for this video in Vietnamese.
     The title should be between 5-10 words, capture the essence of the content, and be engaging.
-    
+
     Script:
     ${scriptContent}
-    
+
     Output format:
     Just provide the title, without any additional explanation or commentary.`;
 
